@@ -1,0 +1,220 @@
+AF Trends — implementation review
+=================================
+
+Checked  [x]  = implemented in this repo
+Unchecked [ ] = not implemented, partial, or out of v1
+
+Local review
+------------
+Storefront     http://127.0.0.1:5174
+API            http://127.0.0.1:8000
+Swagger        http://127.0.0.1:8000/docs
+Media          http://127.0.0.1:8000/media/...
+
+Demo logins (password for all: trends123)
+  superadmin@aftrends.com
+  manager@aftrends.com
+  support@aftrends.com
+  client@aftrends.com
+
+
+1. Client page URLs
+===================
+
+Public (no auth)
+[x]  GET  /                     Landing: hero, categories, arrivals, bestsellers, promo, all tees
+[x]  GET  /shirts/:slug         Product: gallery, color, size, stock, add to cart
+[x]  GET  /login                Sign in (client or staff)
+[x]  GET  /register             Client register only
+
+Client (role = client)
+[x]  GET  /cart                 Cart lines (color, size, qty)
+[x]  GET  /checkout             Address, delivery zone, COD acknowledgement
+[x]  GET  /account/orders       Own order list
+[x]  GET  /account/orders/:id   Tracking; cancel if pending
+[x]  GET  /account/addresses    Saved delivery addresses
+
+Staff (support | manager | superadmin)
+[x]  GET  /staff                Dashboard (order counts, recent orders)
+[x]  GET  /staff/orders         Order list + filters
+[x]  GET  /staff/orders/:id     Notes, status machine, COD paid (role matrix)
+[x]  GET  /staff/products       Shirt list (manager, superadmin)
+[x]  GET  /staff/products/new   Create shirt
+[x]  GET  /staff/products/:id   Edit shirt, colors, sizes, stock grid, images
+[x]  GET  /staff/users          Staff accounts (superadmin)
+[x]  GET  /staff/settings       Store copy, add zones, add palette color (superadmin)
+
+Not built as pages
+[ ]  GET  /account/profile      Edit own name / phone / password (API PATCH /auth/me exists)
+[ ]  GET  /about  /blog  /contact   Marketing pages from the mock, not in v1
+[ ]  GET  /wishlist             Heart icon on landing is decorative only
+
+
+2. APIs  (base /api/v1)
+=======================
+
+Health
+[x]  GET     /health
+
+Auth
+[x]  POST    /auth/register              Public → client
+[x]  POST    /auth/login                 Public (all roles)
+[x]  GET     /auth/me                    Any authenticated
+[x]  PATCH   /auth/me                    Any authenticated  (no client UI)
+
+Public catalog
+[x]  GET     /catalog/products           page, page_size, color_id, size, q, sort
+[x]  GET     /catalog/products/{slug}    Full product; unpublished → 404
+[x]  GET     /catalog/colors
+[x]  GET     /catalog/sizes
+[x]  GET     /delivery-zones             Active zones + fees
+
+Client addresses
+[x]  GET     /addresses
+[x]  POST    /addresses
+[x]  PATCH   /addresses/{id}
+[x]  DELETE  /addresses/{id}
+
+Cart (client, server-side)
+[x]  GET     /cart
+[x]  POST    /cart/items
+[x]  PATCH   /cart/items/{id}
+[x]  DELETE  /cart/items/{id}
+[x]  DELETE  /cart                       Clear all
+
+Client orders (COD)
+[x]  POST    /orders                     pending / unpaid / cash_on_delivery; stock not deducted yet
+[x]  GET     /orders                     Own orders
+[x]  GET     /orders/{id}                Own only; others 404
+[x]  POST    /orders/{id}/cancel         Only while pending
+
+Staff products (manager, superadmin)
+[x]  GET     /staff/products
+[x]  POST    /staff/products
+[x]  GET     /staff/products/{id}
+[x]  PATCH  /staff/products/{id}
+[x]  DELETE  /staff/products/{id}        Soft delete  (no list-page button)
+[x]  POST    /staff/products/{id}/images
+[x]  PATCH  /staff/products/{id}/images/{image_id}
+[x]  DELETE  /staff/products/{id}/images/{image_id}
+[x]  PUT     /staff/products/{id}/variants
+[x]  GET     /staff/palette/colors
+[x]  POST    /staff/palette/colors       Superadmin
+[x]  GET     /staff/palette/sizes        Read-only XS–XXL
+
+Staff orders
+[x]  GET     /staff/orders
+[x]  GET     /staff/orders/{id}
+[x]  PATCH  /staff/orders/{id}/status   Role matrix; deduct on confirm; restore on cancel after confirm
+[x]  PATCH  /staff/orders/{id}/payment  Manager/superadmin; only when delivered
+[x]  POST    /staff/orders/{id}/notes    Internal; clients do not see
+
+Staff users (superadmin)
+[x]  GET     /staff/users
+[x]  POST    /staff/users                manager or support only
+[x]  PATCH  /staff/users/{id}
+
+Store settings (superadmin)
+[x]  GET     /staff/settings
+[x]  PATCH  /staff/settings
+[x]  GET     /staff/delivery-zones
+[x]  POST    /staff/delivery-zones
+[x]  PATCH  /staff/delivery-zones/{id}   (no edit UI; add-only on settings page)
+
+
+3. Product / domain (README v1)
+===============================
+
+[x]  T-shirts with custom designs only
+[x]  Public catalog, no login required
+[x]  Checkout requires a client account (no guest checkout)
+[x]  Staff upload finished designs (customers do not upload artwork)
+[x]  Color + size variants with independent stock
+[x]  Many images per shirt; optional color tag; one primary
+[x]  Cash on delivery only (no card / MoMo / Stripe)
+[x]  Order: pending → confirmed → packed → out_for_delivery → delivered
+[x]  failed_delivery and cancelled paths
+[x]  payment_status unpaid until manager/superadmin marks paid after delivered
+[x]  Stock deducted at confirmed, restored if cancelled after confirm
+[x]  Roles: guest, client, support, manager, superadmin
+[x]  Support cannot confirm, pack, or mark COD collected
+[x]  Client can cancel own pending order
+[x]  Delivery fee by zone
+[x]  Currency GHS (store setting)
+[x]  Seeded shirts, palette, zones, four demo users
+[x]  JWT auth, bcrypt passwords
+[x]  Images stored under api/media, served at /media
+[x]  SQLite locally (api/af_trends.db); DATABASE_URL can point at Postgres later
+
+RBAC on the client
+[x]  Guest: landing + product + login/register
+[x]  Client: cart, checkout, orders, addresses
+[x]  Support: dashboard + orders only
+[x]  Manager: catalog + orders (no users/settings)
+[x]  Superadmin: users + settings as well
+
+
+4. Storefront UI (current, not original README theme)
+=====================================================
+
+README v1 called for dark gray + white with no accent. The live store uses the later NovaTrend-style mock.
+
+[x]  White page, black type, orange #FF5722, wells #F8F8F8
+[x]  Black announcement bar
+[x]  Header: logo, Home / Shop / New Arrivals / Best Sellers / Categories
+[x]  Header tools: search, heart, account, cart badge
+[x]  Hero, category tiles, arrivals carousel, bestsellers, flash-sale + collection banners
+[x]  Real clothing photos (catalog JPEGs), not SVG shirt drawings
+[x]  Pill CTAs; orange primary; black Quick add
+[x]  Product swatches + size picker
+[ ]  Dark gray + white chrome from README §5   (replaced by orange/white)
+[ ]  Landing search / color / size / sort filters  (removed from All tees)
+[ ]  Header search does not filter the catalog (filters UI removed)
+[ ]  Image reorder controls on the product form (sort_order is on the API)
+
+
+5. Polish / partial
+===================
+
+[x]  Empty order list message
+[x]  Login redirect back to the shirt after add-to-cart when logged out
+[x]  Staff can set primary image, color-tag images, delete images
+[x]  Superadmin can create manager/support and deactivate users
+[x]  Superadmin can add delivery zones and palette colors
+[ ]  Postgres + Alembic migrations  (SQLite + SQLAlchemy create_all)
+[ ]  Low-stock count on the dashboard  (threshold is stored, not shown)
+[ ]  low_stock_threshold field on the settings form
+[ ]  Edit / deactivate an existing delivery zone in the UI
+[ ]  Soft-delete a shirt from the products list UI
+[ ]  Combined “mark delivered and paid” in one request
+[ ]  Guest cart in localStorage
+[ ]  PATCH /auth/me profile screen
+
+
+6. Out of v1 (intentionally unchecked)
+======================================
+
+[ ]  Card / mobile money / Stripe
+[ ]  Customer artwork upload / print preview
+[ ]  Wishlists, reviews, coupons, gift cards, subscriptions
+[ ]  Multi-currency checkout
+[ ]  Native mobile apps
+[ ]  Real-time chat
+[ ]  Analytics beyond simple order counts
+[ ]  Abandoned-cart email
+[ ]  Returns / exchanges status
+[ ]  Multi-vendor
+[ ]  Email change
+[ ]  Refunded payment path
+
+
+7. How to smoke-test
+====================
+
+1. Open http://127.0.0.1:5174 — landing loads published tees with photos.
+2. Open a shirt, pick color + size, add to cart → redirected to login if guest.
+3. Register or sign in as client@aftrends.com → cart → checkout → COD order pending/unpaid.
+4. Sign in as manager@aftrends.com → /staff/orders/:id → confirmed (stock drops) → packed → out_for_delivery → delivered → mark paid.
+5. Sign in as support@aftrends.com — no Shirts / Users / Settings; cannot confirm or collect cash.
+6. Sign in as superadmin@aftrends.com → /staff/users and /staff/settings.
+7. Swagger at http://127.0.0.1:8000/docs for the full request/response contract.
