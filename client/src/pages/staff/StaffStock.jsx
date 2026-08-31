@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { money, request } from '../../api.js'
+import { PRIV, can } from '../../privileges.js'
 import AddShirtModal from '../../components/AddShirtModal.jsx'
 import StockItemModal from '../../components/StockItemModal.jsx'
 import { IconShirt } from '../../components/Icons.jsx'
@@ -21,6 +22,7 @@ export default function StaffStock({ session }) {
   const [error, setError] = useState('')
   const [adding, setAdding] = useState(false)
   const [openId, setOpenId] = useState(null)
+  const canWrite = can(session.user, PRIV.CATALOG_WRITE)
 
   function load(nextPage = page, nextSize = pageSize) {
     request(`/staff/stock?page=${nextPage}&page_size=${nextSize}`, { token: session.token })
@@ -53,7 +55,11 @@ export default function StaffStock({ session }) {
       <header className="dash-head">
         <div>
           <h1>Stock</h1>
-          <p>Receive t-shirts into inventory. Open a row for colourways, cost, and sizes.</p>
+          <p>
+            {canWrite
+              ? 'Receive t-shirts into inventory. Open a row for colourways, cost, and sizes.'
+              : 'Inventory on hand. Open a row to see colourways, cost, and sizes.'}
+          </p>
         </div>
       </header>
 
@@ -70,15 +76,17 @@ export default function StaffStock({ session }) {
           Inventory
           <span className="count">{total}</span>
         </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={adding}
-          className={adding ? 'active' : ''}
-          onClick={() => setAdding(true)}
-        >
-          Add t-shirt
-        </button>
+        {canWrite ? (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={adding}
+            className={adding ? 'active' : ''}
+            onClick={() => setAdding(true)}
+          >
+            Add t-shirt
+          </button>
+        ) : null}
       </div>
 
       {items.length > 0 ? (
@@ -103,10 +111,14 @@ export default function StaffStock({ session }) {
         <div className="shirts-empty">
           <IconShirt />
           <h2>No shirts in stock yet</h2>
-          <p className="muted">Use the Add t-shirt tab to receive the first batch.</p>
-          <button type="button" className="btn" onClick={() => setAdding(true)}>
-            Add t-shirt
-          </button>
+          <p className="muted">
+            {canWrite ? 'Use the Add t-shirt tab to receive the first batch.' : 'No shirts in inventory yet.'}
+          </p>
+          {canWrite ? (
+            <button type="button" className="btn" onClick={() => setAdding(true)}>
+              Add t-shirt
+            </button>
+          ) : null}
         </div>
       ) : (
         <div className="dash-card table-card">
@@ -167,7 +179,7 @@ export default function StaffStock({ session }) {
         </div>
       ) : null}
 
-      {adding ? (
+      {adding && canWrite ? (
         <AddShirtModal
           session={session}
           palette={palette}

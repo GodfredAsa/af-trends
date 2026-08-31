@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { money, request } from '../api.js'
+import { PRIV, can } from '../privileges.js'
 
 const LABELS = {
   out_of_stock: 'Out of stock',
@@ -121,7 +122,7 @@ export default function StockItemModal({ session, item, onClose }) {
             Close
           </button>
           <Link className="btn" to={`/staff/products/${item.id}`} onClick={onClose}>
-            Adjust stock
+            {can(session.user, PRIV.CATALOG_WRITE) ? 'Adjust stock' : 'View shirt'}
           </Link>
         </div>
       </div>

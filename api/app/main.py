@@ -4,8 +4,22 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.database import Base, SessionLocal, engine, ensure_schema
-from app.routers import addresses, auth, cart, catalog, orders, staff_orders, staff_products, staff_settings, staff_stock, staff_users
+from app.privileges import hydrate
+from app.routers import (
+    addresses,
+    auth,
+    cart,
+    catalog,
+    orders,
+    staff_orders,
+    staff_privileges,
+    staff_products,
+    staff_settings,
+    staff_stock,
+    staff_users,
+)
 from app.seed import seed_if_empty
+from app.serializers import get_settings
 
 settings.media_path.mkdir(parents=True, exist_ok=True)
 (settings.media_path / "products").mkdir(parents=True, exist_ok=True)
@@ -15,6 +29,7 @@ Base.metadata.create_all(bind=engine)
 ensure_schema()
 with SessionLocal() as db:
     seed_if_empty(db)
+    hydrate(getattr(get_settings(db), "privilege_matrix", "") or "")
 
 app = FastAPI(
     title=settings.app_name,
@@ -42,8 +57,10 @@ app.include_router(staff_stock.router, prefix="/api/v1/staff", tags=["staff-stoc
 app.include_router(staff_orders.router, prefix="/api/v1/staff", tags=["staff-orders"])
 app.include_router(staff_users.router, prefix="/api/v1/staff", tags=["staff-users"])
 app.include_router(staff_settings.router, prefix="/api/v1/staff", tags=["staff-settings"])
+app.include_router(staff_privileges.router, prefix="/api/v1/staff", tags=["staff-privileges"])
 
 
 @app.get("/api/v1/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "service": "af-trends"}
+

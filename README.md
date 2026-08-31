@@ -160,12 +160,26 @@ Roles are stored on the user. Every protected route checks **role**, not only �
 | Add order notes | | | Yes | Yes | Yes |
 | Update order status (see matrix below) | | cancel own if pending | limited | Yes | Yes |
 | Mark COD collected | | | | Yes | Yes |
+| Delete delivered / cancelled orders (after 2 days) | | | | Yes | Yes |
+| View shirts and stock | | | Yes | Yes | Yes |
 | Create / edit / unpublish products | | | | Yes | Yes |
 | Upload / reorder / delete product images | | | | Yes | Yes |
 | Set colors, sizes, stock | | | | Yes | Yes |
-| Create manager / support accounts | | | | | Yes |
+| Add palette colors | | | | Yes | Yes |
+| Create manager / support / client accounts | | | | | Yes |
 | Deactivate staff or clients | | | | | Yes |
 | Store settings (zones, fees, copy) | | | | | Yes |
+
+**CRUD matrix (staff)**
+
+| Resource | Support | Manager | Superadmin |
+| --- | --- | --- | --- |
+| Orders | Read; update notes + limited status | Read; full status + COD; delete after 2 days | Same as manager |
+| Shirts | Read | Create, read, update, delete | Same as manager |
+| Stock | Read | Create, read, update | Same as manager |
+| Palette colors | Read | Create, read | Same as manager |
+| Users | — | — | Create, read, update |
+| Settings / zones | — | — | Create, read, update |
 
 **Order status who can set what**
 
@@ -179,7 +193,7 @@ Roles are stored on the user. Every protected route checks **role**, not only �
 | `out_for_delivery` → `failed_delivery` | | Yes | Yes | Yes |
 | Any non-delivered → `cancelled` | | | Yes | Yes |
 
-Support cannot confirm stock, pack, or mark payment collected. That keeps support from accidentally committing inventory.
+Support cannot confirm stock, pack, mark payment collected, or change the catalog. That keeps support from accidentally committing inventory. Privileges live in `api/app/privileges.py` and `client/src/privileges.js`. Login and `/auth/me` return the current user's privilege list.
 
 ---
 
@@ -292,7 +306,8 @@ IDs are UUIDs. Timestamps are UTC ISO-8601.
   "phone": "string",
   "role": "superadmin | manager | support | client",
   "is_active": true,
-  "created_at": "datetime"
+  "created_at": "datetime",
+  "privileges": ["orders.read", "catalog.read"]
 }
 ```
 
@@ -426,6 +441,7 @@ Base path: `/api/v1`
 
 Role legend: **Public** · **Client** · **Support** · **Manager** · **Superadmin**  
 `Staff` = Support + Manager + Superadmin  
+`Catalog readers` = Staff  
 `Catalog editors` = Manager + Superadmin
 
 ---
@@ -628,7 +644,7 @@ Allowed only when `status=pending`. Sets `cancelled`.
 
 ### 11.7 Staff — products (catalog editors)
 
-#### `GET /api/v1/staff/products` — Catalog editors
+#### `GET /api/v1/staff/products` — Catalog readers
 
 Includes unpublished. Query: `page`, `page_size`, `q`, `is_published`.
 
@@ -653,7 +669,7 @@ If `variants` is omitted, the API builds a zero-stock grid from `color_ids` × `
 
 Response `201` — full product (images empty).
 
-#### `GET /api/v1/staff/products/{id}` — Catalog editors
+#### `GET /api/v1/staff/products/{id}` — Catalog readers
 
 #### `PATCH /api/v1/staff/products/{id}` — Catalog editors
 
@@ -714,14 +730,14 @@ Replace stock/SKU/price for the existing grid (does not invent new color/size pa
 
 `price` omitted → inherit `base_price`.
 
-#### `GET /api/v1/staff/palette/colors` — Catalog editors  
-#### `POST /api/v1/staff/palette/colors` — Superadmin
+#### `GET /api/v1/staff/palette/colors` — Staff (catalog read)  
+#### `POST /api/v1/staff/palette/colors` — Manager, Superadmin
 
 ```json
 { "name": "Forest", "hex": "#1F4D2A" }
 ```
 
-#### `GET /api/v1/staff/palette/sizes` — Catalog editors
+#### `GET /api/v1/staff/palette/sizes` — Staff (catalog read)
 
 Read-only in v1 (fixed XS–XXL).
 
@@ -855,23 +871,26 @@ Partial update of the object above.
 | GET | `/api/v1/orders` | Client |
 | GET | `/api/v1/orders/{id}` | Client |
 | POST | `/api/v1/orders/{id}/cancel` | Client |
-| GET | `/api/v1/staff/products` | Manager, Superadmin |
+| GET | `/api/v1/staff/products` | Staff |
 | POST | `/api/v1/staff/products` | Manager, Superadmin |
-| GET | `/api/v1/staff/products/{id}` | Manager, Superadmin |
+| GET | `/api/v1/staff/products/{id}` | Staff |
 | PATCH | `/api/v1/staff/products/{id}` | Manager, Superadmin |
 | DELETE | `/api/v1/staff/products/{id}` | Manager, Superadmin |
 | POST | `/api/v1/staff/products/{id}/images` | Manager, Superadmin |
 | PATCH | `/api/v1/staff/products/{id}/images/{image_id}` | Manager, Superadmin |
 | DELETE | `/api/v1/staff/products/{id}/images/{image_id}` | Manager, Superadmin |
 | PUT | `/api/v1/staff/products/{id}/variants` | Manager, Superadmin |
-| GET | `/api/v1/staff/palette/colors` | Manager, Superadmin |
-| POST | `/api/v1/staff/palette/colors` | Superadmin |
-| GET | `/api/v1/staff/palette/sizes` | Manager, Superadmin |
+| GET | `/api/v1/staff/stock` | Staff |
+| POST | `/api/v1/staff/stock` | Manager, Superadmin |
+| GET | `/api/v1/staff/palette/colors` | Staff |
+| POST | `/api/v1/staff/palette/colors` | Manager, Superadmin |
+| GET | `/api/v1/staff/palette/sizes` | Staff |
 | GET | `/api/v1/staff/orders` | Staff |
 | GET | `/api/v1/staff/orders/{id}` | Staff |
 | PATCH | `/api/v1/staff/orders/{id}/status` | Staff (matrix) |
 | PATCH | `/api/v1/staff/orders/{id}/payment` | Manager, Superadmin |
 | POST | `/api/v1/staff/orders/{id}/notes` | Staff |
+| DELETE | `/api/v1/staff/orders/{id}` | Manager, Superadmin (delivered/cancelled, 2 days) |
 | GET | `/api/v1/staff/users` | Superadmin |
 | POST | `/api/v1/staff/users` | Superadmin |
 | PATCH | `/api/v1/staff/users/{id}` | Superadmin |

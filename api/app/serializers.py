@@ -1,10 +1,12 @@
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from app.models import ColorPalette, Order, Product, ProductImage, StoreSettings, Variant
+from app.models import ColorPalette, Order, Product, ProductImage, StoreSettings, User, Variant
 from app.money import as_money, money_str
+from app.privileges import privileges_for
 from app.schemas import (
     CartItemOut,
     CartOut,
@@ -20,9 +22,23 @@ from app.schemas import (
     ProductOut,
     StockColorQty,
     StockItemOut,
+    UserOut,
     VariantOut,
     ZoneOut,
 )
+
+
+def user_out(user: User) -> UserOut:
+    return UserOut(
+        id=user.id,
+        email=user.email,
+        full_name=user.full_name,
+        phone=user.phone,
+        role=user.role,
+        is_active=user.is_active,
+        created_at=user.created_at,
+        privileges=privileges_for(user.role),
+    )
 
 
 def get_settings(db: Session) -> StoreSettings:
@@ -190,6 +206,36 @@ def cart_out(items, db: Session) -> CartOut:
     return CartOut(items=mapped, subtotal=money_str(subtotal), currency=currency(db))
 
 
+PURGE_STATUSES = {"delivered", "cancelled"}
+PURGE_AFTER = timedelta(days=2)
+
+
+def _aware(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value
+
+
+def order_purge_at(order: Order) -> datetime | None:
+    if order.status not in PURGE_STATUSES:
+        return None
+    when = None
+    for event in order.events or []:
+        if event.to_status == order.status:
+            created = _aware(event.created_at)
+            if created is not None and (when is None or created > when):
+                when = created
+    when = when or _aware(order.updated_at) or _aware(order.created_at)
+    return when + PURGE_AFTER if when else None
+
+
+def can_purge_order(order: Order) -> bool:
+    after = order_purge_at(order)
+    return bool(after and datetime.now(timezone.utc) >= after)
+
+
 def order_out(order: Order, include_staff: bool = False) -> OrderOut:
     notes: list[OrderNoteOut] = []
     events: list[OrderEventOut] = []
@@ -265,6 +311,8 @@ def order_out(order: Order, include_staff: bool = False) -> OrderOut:
         customer_note=order.customer_note,
         created_at=order.created_at,
         updated_at=order.updated_at,
+        can_delete=can_purge_order(order) if include_staff else False,
+        deletable_after=order_purge_at(order) if include_staff else None,
     )
 
 

@@ -149,9 +149,10 @@ Store settings (superadmin)
 RBAC on the client
 [x]  Guest: landing + product + login/register
 [x]  Client: cart, checkout, orders, addresses
-[x]  Support: dashboard + orders only
-[x]  Manager: catalog + orders (no users/settings)
+[x]  Support: dashboard + orders (limited status) + read-only shirts/stock
+[x]  Manager: catalog CRUD + full order update/COD/delete (no users/settings)
 [x]  Superadmin: users + settings as well
+[x]  Privilege matrix in api/app/privileges.py and client/src/privileges.js
 
 
 4. Storefront UI (current, not original README theme)

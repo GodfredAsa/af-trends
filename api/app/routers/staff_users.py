@@ -7,20 +7,13 @@ from app.deps import DbSession, Pagination, SuperadminUser
 from app.models import User, UserRole
 from app.schemas import StaffUserCreate, StaffUserPatch, UserOut
 from app.security import hash_password
+from app.serializers import user_out
 
 router = APIRouter()
 
 
 def _out(user: User) -> UserOut:
-    return UserOut(
-        id=user.id,
-        email=user.email,
-        full_name=user.full_name,
-        phone=user.phone,
-        role=user.role,
-        is_active=user.is_active,
-        created_at=user.created_at,
-    )
+    return user_out(user)
 
 
 @router.get("/users")

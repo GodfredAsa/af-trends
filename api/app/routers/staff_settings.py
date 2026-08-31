@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
-from app.deps import DbSession, SuperadminUser
+from app.deps import DbSession, SettingsAdmin
 from app.models import DeliveryZone
 from app.money import money_str
 from app.schemas import SettingsOut, SettingsPatch, ZoneCreate, ZoneOut, ZonePatch
@@ -13,7 +13,7 @@ router = APIRouter()
 
 
 @router.get("/settings", response_model=SettingsOut)
-def read_settings(_admin: SuperadminUser, db: DbSession) -> SettingsOut:
+def read_settings(_admin: SettingsAdmin, db: DbSession) -> SettingsOut:
     row = get_settings(db)
     return SettingsOut(
         store_name=row.store_name,
@@ -26,7 +26,7 @@ def read_settings(_admin: SuperadminUser, db: DbSession) -> SettingsOut:
 
 
 @router.patch("/settings", response_model=SettingsOut)
-def patch_settings(payload: SettingsPatch, _admin: SuperadminUser, db: DbSession) -> SettingsOut:
+def patch_settings(payload: SettingsPatch, _admin: SettingsAdmin, db: DbSession) -> SettingsOut:
     row = get_settings(db)
     data = payload.model_dump(exclude_unset=True)
     for key, value in data.items():
@@ -45,7 +45,7 @@ def patch_settings(payload: SettingsPatch, _admin: SuperadminUser, db: DbSession
 
 
 @router.get("/delivery-zones")
-def list_zones(_admin: SuperadminUser, db: DbSession):
+def list_zones(_admin: SettingsAdmin, db: DbSession):
     rows = db.scalars(select(DeliveryZone).order_by(DeliveryZone.name)).all()
     return {
         "items": [
@@ -56,7 +56,7 @@ def list_zones(_admin: SuperadminUser, db: DbSession):
 
 
 @router.post("/delivery-zones", response_model=ZoneOut, status_code=status.HTTP_201_CREATED)
-def create_zone(payload: ZoneCreate, _admin: SuperadminUser, db: DbSession) -> ZoneOut:
+def create_zone(payload: ZoneCreate, _admin: SettingsAdmin, db: DbSession) -> ZoneOut:
     zone = DeliveryZone(name=payload.name.strip(), fee=payload.fee, is_active=payload.is_active)
     db.add(zone)
     db.commit()
@@ -65,7 +65,7 @@ def create_zone(payload: ZoneCreate, _admin: SuperadminUser, db: DbSession) -> Z
 
 
 @router.patch("/delivery-zones/{zone_id}", response_model=ZoneOut)
-def patch_zone(zone_id: UUID, payload: ZonePatch, _admin: SuperadminUser, db: DbSession) -> ZoneOut:
+def patch_zone(zone_id: UUID, payload: ZonePatch, _admin: SettingsAdmin, db: DbSession) -> ZoneOut:
     zone = db.get(DeliveryZone, zone_id)
     if zone is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Zone not found.")

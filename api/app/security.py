@@ -10,7 +10,8 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
-from app.models import User
+from app.models import STAFF_ROLES, User
+from app.privileges import Priv, has_priv
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -73,5 +74,10 @@ def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired session.",
+        )
+    if user.role in {role.value for role in STAFF_ROLES} and not has_priv(user.role, Priv.STAFF_LOGIN):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This role is not allowed to sign in.",
         )
     return user

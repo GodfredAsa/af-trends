@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { money, request } from '../../api.js'
+import { PRIV, can } from '../../privileges.js'
 import AddShirtModal from '../../components/AddShirtModal.jsx'
 import { IconSearch, IconShirt } from '../../components/Icons.jsx'
 
@@ -27,6 +28,7 @@ export default function StaffProducts({ session }) {
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
   const navigate = useNavigate()
+  const canWrite = can(session.user, PRIV.CATALOG_WRITE)
 
   function load() {
     setLoading(true)
@@ -76,7 +78,11 @@ export default function StaffProducts({ session }) {
       <header className="dash-head">
         <div>
           <h1>Shirts</h1>
-          <p>Photos, prices, colors, and publish status for the catalog.</p>
+          <p>
+            {canWrite
+              ? 'Photos, prices, colors, and publish status for the catalog.'
+              : 'Read-only catalog. Managers change shirts, stock, and photos.'}
+          </p>
         </div>
         <div className="dash-tools">
           <label className="dash-search">
@@ -93,9 +99,11 @@ export default function StaffProducts({ session }) {
               <IconSearch />
             </button>
           </label>
-          <button type="button" className="btn" onClick={() => setAdding(true)}>
-            New shirt
-          </button>
+          {canWrite ? (
+            <button type="button" className="btn" onClick={() => setAdding(true)}>
+              New shirt
+            </button>
+          ) : null}
         </div>
       </header>
 
@@ -146,15 +154,17 @@ export default function StaffProducts({ session }) {
               <span className="count">{counts[item.id]}</span>
             </button>
           ))}
-          <button
-            type="button"
-            role="tab"
-            aria-selected={adding}
-            className={adding ? 'active' : ''}
-            onClick={() => setAdding(true)}
-          >
-            New shirt
-          </button>
+          {canWrite ? (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={adding}
+              className={adding ? 'active' : ''}
+              onClick={() => setAdding(true)}
+            >
+              New shirt
+            </button>
+          ) : null}
         </div>
         <div className="page-sizes" role="group" aria-label="Cards per page">
           {PAGE_SIZES.map((size) => (
@@ -178,10 +188,12 @@ export default function StaffProducts({ session }) {
           <h2>{products.length === 0 ? 'No shirts yet' : 'Nothing in this view'}</h2>
           <p className="muted">
             {products.length === 0
-              ? 'Add a shirt to start the catalog. You can publish it after photos are ready.'
+              ? canWrite
+                ? 'Add a shirt to start the catalog. You can publish it after photos are ready.'
+                : 'No shirts in the catalog yet.'
               : 'Try another tab or a different search.'}
           </p>
-          {products.length === 0 ? (
+          {products.length === 0 && canWrite ? (
             <button type="button" className="btn" onClick={() => setAdding(true)}>
               New shirt
             </button>
@@ -231,7 +243,7 @@ export default function StaffProducts({ session }) {
                 </div>
                 <div className="shirt-actions">
                   <Link className="btn ghost" to={`/staff/products/${product.id}`}>
-                    Edit
+                    {canWrite ? 'Edit' : 'View'}
                   </Link>
                   {product.is_published ? (
                     <Link className="btn ghost" to={`/shirts/${product.slug}`} target="_blank" rel="noreferrer">
@@ -265,7 +277,7 @@ export default function StaffProducts({ session }) {
           </button>
         </div>
       ) : null}
-      {adding ? (
+      {adding && canWrite ? (
         <AddShirtModal
           session={session}
           mode="catalog"

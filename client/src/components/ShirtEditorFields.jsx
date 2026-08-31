@@ -29,7 +29,15 @@ export function buildVariants(form) {
   return variants
 }
 
-export default function ShirtEditorFields({ form, onChange, palette, showQty = true, session, onPaletteChange }) {
+export default function ShirtEditorFields({
+  form,
+  onChange,
+  palette,
+  showQty = true,
+  session,
+  onPaletteChange,
+  disabled = false,
+}) {
   const colorMap = Object.fromEntries(palette.map((color) => [color.id, color]))
   const [newName, setNewName] = useState('')
   const [newHex, setNewHex] = useState('#2A3B30')
@@ -87,6 +95,7 @@ export default function ShirtEditorFields({ form, onChange, palette, showQty = t
           placeholder="Harbor Stripe Tee"
           autoComplete="off"
           required
+          disabled={disabled}
         />
         <label htmlFor="shirt-desc">Description</label>
         <textarea
@@ -94,6 +103,7 @@ export default function ShirtEditorFields({ form, onChange, palette, showQty = t
           value={form.description}
           onChange={(event) => patch({ description: event.target.value })}
           placeholder="Fit, fabric, and what makes this tee worth wearing."
+          disabled={disabled}
         />
         <div className="stock-prices">
           <div>
@@ -104,6 +114,7 @@ export default function ShirtEditorFields({ form, onChange, palette, showQty = t
               value={form.cost_price}
               onChange={(event) => patch({ cost_price: event.target.value })}
               required
+              disabled={disabled}
             />
           </div>
           <div>
@@ -114,6 +125,7 @@ export default function ShirtEditorFields({ form, onChange, palette, showQty = t
               value={form.selling_price}
               onChange={(event) => patch({ selling_price: event.target.value })}
               required
+              disabled={disabled}
             />
           </div>
         </div>
@@ -131,6 +143,7 @@ export default function ShirtEditorFields({ form, onChange, palette, showQty = t
                 type="button"
                 className={`choice-chip${on ? ' on' : ''}`}
                 aria-pressed={on}
+                disabled={disabled}
                 onClick={() => toggle('colorIds', color.id)}
               >
                 <span className="swatch" style={{ background: color.hex }} />
@@ -139,7 +152,7 @@ export default function ShirtEditorFields({ form, onChange, palette, showQty = t
             )
           })}
         </div>
-        {session ? (
+        {session && !disabled ? (
           <div className="color-create">
             <div>
               <label htmlFor="new-color-name">New colour</label>
@@ -177,6 +190,7 @@ export default function ShirtEditorFields({ form, onChange, palette, showQty = t
                 type="button"
                 className={`choice-chip size${on ? ' on' : ''}`}
                 aria-pressed={on}
+                disabled={disabled}
                 onClick={() => toggle('sizes', size)}
               >
                 {size}
@@ -207,6 +221,7 @@ export default function ShirtEditorFields({ form, onChange, palette, showQty = t
                         min="0"
                         value={form.qty[`${colorId}:${size}`] ?? '0'}
                         onChange={(event) => setQty(colorId, size, event.target.value)}
+                        disabled={disabled}
                         aria-label={`${colorMap[colorId]?.name || 'Color'} ${size}`}
                       />
                     </label>

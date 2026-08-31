@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { request } from '../../api.js'
+import PrivilegeMatrix from '../../components/PrivilegeMatrix.jsx'
 import UserFormModal from '../../components/UserFormModal.jsx'
 import { IconUsers } from '../../components/Icons.jsx'
 
 const TABS = [
   { id: 'staff', label: 'Staff' },
   { id: 'users', label: 'Users' },
+  { id: 'access', label: 'Access' },
 ]
 
 const ROLE_LABELS = {
@@ -29,7 +31,7 @@ function isStaffRole(role) {
   return role !== 'client'
 }
 
-export default function StaffUsers({ session }) {
+export default function StaffUsers({ session, onUser }) {
   const [users, setUsers] = useState([])
   const [tab, setTab] = useState('staff')
   const [query, setQuery] = useState('')
@@ -102,6 +104,7 @@ export default function StaffUsers({ session }) {
     }
   }
 
+  const isAccess = tab === 'access'
   const createLabel = tab === 'staff' ? 'New staff' : 'New user'
 
   return (
@@ -109,21 +112,27 @@ export default function StaffUsers({ session }) {
       <header className="dash-head">
         <div>
           <h1>People</h1>
-          <p>Staff run the console. Users are customers on the store.</p>
+          <p>
+            {isAccess
+              ? 'Login and role privileges for support and managers. Superadmin stays fully on.'
+              : 'Staff run the console. Users are customers on the store.'}
+          </p>
         </div>
-        <div className="dash-tools">
-          <label className="dash-search">
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder={tab === 'staff' ? 'Search staff' : 'Search users'}
-              aria-label="Search people"
-            />
-          </label>
-          <button type="button" className="btn" onClick={() => { setModalError(''); setAdding(true) }}>
-            {createLabel}
-          </button>
-        </div>
+        {isAccess ? null : (
+          <div className="dash-tools">
+            <label className="dash-search">
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder={tab === 'staff' ? 'Search staff' : 'Search users'}
+                aria-label="Search people"
+              />
+            </label>
+            <button type="button" className="btn" onClick={() => { setModalError(''); setAdding(true) }}>
+              {createLabel}
+            </button>
+          </div>
+        )}
       </header>
 
       {error ? <p className="error">{error}</p> : null}
@@ -143,21 +152,25 @@ export default function StaffUsers({ session }) {
             }}
           >
             {item.label}
-            <span className="count">{counts[item.id]}</span>
+            {item.id !== 'access' ? <span className="count">{counts[item.id]}</span> : null}
           </button>
         ))}
-        <button
-          type="button"
-          role="tab"
-          aria-selected={adding}
-          className={adding ? 'active' : ''}
-          onClick={() => { setModalError(''); setAdding(true) }}
-        >
-          {createLabel}
-        </button>
+        {isAccess ? null : (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={adding}
+            className={adding ? 'active' : ''}
+            onClick={() => { setModalError(''); setAdding(true) }}
+          >
+            {createLabel}
+          </button>
+        )}
       </div>
 
-      {visible.length === 0 ? (
+      {isAccess ? <PrivilegeMatrix session={session} onUser={onUser} /> : null}
+
+      {!isAccess && visible.length === 0 ? (
         <div className="shirts-empty">
           <IconUsers />
           <h2>{users.length === 0 ? 'No accounts yet' : `No ${tab === 'staff' ? 'staff' : 'users'} in this view`}</h2>
@@ -172,7 +185,7 @@ export default function StaffUsers({ session }) {
             {createLabel}
           </button>
         </div>
-      ) : (
+      ) : !isAccess ? (
         <div className="dash-card table-card">
           <div className="table-wrap">
             <table className="table stock-table">
@@ -229,7 +242,7 @@ export default function StaffUsers({ session }) {
             </table>
           </div>
         </div>
-      )}
+      ) : null}
 
       {adding ? (
         <UserFormModal

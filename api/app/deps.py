@@ -6,7 +6,8 @@ from fastapi import Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import CATALOG_EDITOR_ROLES, STAFF_ROLES, User, UserRole
+from app.models import STAFF_ROLES, User, UserRole
+from app.privileges import Priv, has_priv
 from app.security import get_current_user
 
 DbSession = Annotated[Session, Depends(get_db)]
@@ -27,11 +28,31 @@ def require_roles(*roles: UserRole) -> Callable[[User], User]:
     return dependency
 
 
+def require_priv(*privs: Priv) -> Callable[[User], User]:
+    needed = tuple(privs)
+
+    def dependency(user: CurrentUser) -> User:
+        if not has_priv(user.role, *needed):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have permission to do this.",
+            )
+        return user
+
+    return dependency
+
+
 ClientUser = Annotated[User, Depends(require_roles(UserRole.client))]
 StaffUser = Annotated[User, Depends(require_roles(*STAFF_ROLES))]
-CatalogEditor = Annotated[User, Depends(require_roles(*CATALOG_EDITOR_ROLES))]
-SuperadminUser = Annotated[User, Depends(require_roles(UserRole.superadmin))]
-ManagerPlus = Annotated[User, Depends(require_roles(UserRole.manager, UserRole.superadmin))]
+CatalogReader = Annotated[User, Depends(require_priv(Priv.CATALOG_READ))]
+CatalogEditor = Annotated[User, Depends(require_priv(Priv.CATALOG_WRITE))]
+CatalogDeleter = Annotated[User, Depends(require_priv(Priv.CATALOG_DELETE))]
+PaletteEditor = Annotated[User, Depends(require_priv(Priv.PALETTE_WRITE))]
+OrderCollector = Annotated[User, Depends(require_priv(Priv.ORDERS_COLLECT))]
+OrderDeleter = Annotated[User, Depends(require_priv(Priv.ORDERS_DELETE))]
+SuperadminUser = Annotated[User, Depends(require_priv(Priv.USERS_MANAGE))]
+SettingsAdmin = Annotated[User, Depends(require_priv(Priv.SETTINGS_MANAGE))]
+ManagerPlus = OrderCollector
 
 
 def pagination(

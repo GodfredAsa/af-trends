@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.catalog import ensure_colors, ensure_sizes, ensure_variant_grid
-from app.deps import CatalogEditor, DbSession
+from app.deps import CatalogEditor, CatalogReader, DbSession
 from app.media import slugify
 from app.models import Product, ProductColor, Variant
 from app.schemas import StockCreate, StockItemOut
@@ -39,7 +39,7 @@ def _unique_slug(db: DbSession, name: str) -> str:
 
 @router.get("/stock")
 def list_stock(
-    _user: CatalogEditor,
+    _user: CatalogReader,
     db: DbSession,
     page_num: int = Query(1, ge=1, alias="page"),
     page_size: int = Query(15, alias="page_size"),

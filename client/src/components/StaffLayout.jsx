@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, Link } from 'react-router-dom'
-import { IconBag, IconBoxes, IconChevron, IconCog, IconGrid, IconLogout, IconShirt, IconUsers } from './Icons.jsx'
+import { IconBag, IconBoxes, IconChevron, IconCog, IconGrid, IconLogout, IconShield, IconShirt, IconUsers } from './Icons.jsx'
 import Logo from './Logo.jsx'
+import { PRIV, can } from '../privileges.js'
 
 const SIDEBAR_KEY = 'af-trends-sidebar-collapsed'
 
@@ -26,8 +27,9 @@ function NavItem({ to, end, icon, label }) {
 
 export default function StaffLayout({ session, onLogout }) {
   const role = session?.user?.role
-  const canCatalog = role === 'manager' || role === 'superadmin'
-  const canUsers = role === 'superadmin'
+  const canCatalog = can(session?.user, PRIV.CATALOG_READ)
+  const canUsers = can(session?.user, PRIV.USERS_MANAGE)
+  const canSettings = can(session?.user, PRIV.SETTINGS_MANAGE)
   const [collapsed, setCollapsed] = useState(() => {
     try {
       return localStorage.getItem(SIDEBAR_KEY) === '1'
@@ -67,9 +69,10 @@ export default function StaffLayout({ session, onLogout }) {
           {canCatalog ? <NavItem to="/staff/products" icon={<IconShirt />} label="Shirts" /> : null}
           {canCatalog ? <NavItem to="/staff/stock" icon={<IconBoxes />} label="Stock" /> : null}
           {canUsers ? <NavItem to="/staff/users" icon={<IconUsers />} label="Users" /> : null}
+          <NavItem to="/staff/control" icon={<IconShield />} label="Control Center" />
         </nav>
         <div className="side-foot">
-          {canUsers ? <NavItem to="/staff/settings" icon={<IconCog />} label="Settings" /> : null}
+          {canSettings ? <NavItem to="/staff/settings" icon={<IconCog />} label="Settings" /> : null}
           <button type="button" className="side-logout" onClick={onLogout} title="Sign out">
             <IconLogout />
             <span className="side-label">Sign out</span>

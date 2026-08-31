@@ -54,6 +54,7 @@ class PaymentMethod(str, enum.Enum):
 
 
 STAFF_ROLES = {UserRole.support, UserRole.manager, UserRole.superadmin}
+CATALOG_READER_ROLES = STAFF_ROLES
 CATALOG_EDITOR_ROLES = {UserRole.manager, UserRole.superadmin}
 STOCK_RESERVED_STATUSES = {
     OrderStatus.confirmed,
@@ -122,6 +123,7 @@ class StoreSettings(Base):
         default="Please have the exact amount ready. Payment is collected on delivery.",
     )
     low_stock_threshold: Mapped[int] = mapped_column(Integer, default=5)
+    privilege_matrix: Mapped[str] = mapped_column(Text, default="")
 
 
 class DeliveryZone(Base):
@@ -195,6 +197,7 @@ class ProductImage(Base):
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=new_uuid)
     product_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("products.id"), index=True)
     url: Mapped[str] = mapped_column(String(512))
+    public_id: Mapped[str] = mapped_column(String(255), default="")
     alt_text: Mapped[str] = mapped_column(String(160), default="")
     sort_order: Mapped[int] = mapped_column(Integer, default=0)
     is_primary: Mapped[bool] = mapped_column(Boolean, default=False)

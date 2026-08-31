@@ -2,17 +2,28 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { request } from '../../api.js'
 import ShirtEditorFields, { emptyShirtForm, buildVariants } from '../../components/ShirtEditorFields.jsx'
+import { PRIV, can } from '../../privileges.js'
 
 export default function ProductForm({ session }) {
   const { id } = useParams()
   const isNew = id === 'new'
   const navigate = useNavigate()
+  const canWrite = can(session.user, PRIV.CATALOG_WRITE)
+  const canDelete = can(session.user, PRIV.CATALOG_DELETE)
   const [palette, setPalette] = useState([])
   const [product, setProduct] = useState(null)
   const [form, setForm] = useState(() => emptyShirtForm())
   const [published, setPublished] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [uploadColor, setUploadColor] = useState('')
+  const [uploading, setUploading] = useState(false)
+
+  useEffect(() => {
+    if (isNew && !canWrite) {
+      navigate('/staff/products', { replace: true })
+    }
+  }, [isNew, canWrite, navigate])
 
   useEffect(() => {
     request('/staff/palette/colors', { token: session.token }).then((data) => {
@@ -41,6 +52,7 @@ export default function ProductForm({ session }) {
           qty,
         })
         setPublished(data.is_published)
+        setUploadColor((current) => current || data.colors[0]?.id || '')
       })
       .catch((err) => setError(err.message))
   }, [id, isNew, session.token])
@@ -103,8 +115,16 @@ export default function ProductForm({ session }) {
   async function upload(event) {
     const files = event.target.files
     if (!files?.length || !product) return
+    if (!uploadColor) {
+      setError('Select a color before adding photos.')
+      event.target.value = ''
+      return
+    }
     const payload = new FormData()
     Array.from(files).forEach((file) => payload.append('files', file))
+    payload.append('color_id', uploadColor)
+    setUploading(true)
+    setError('')
     try {
       const saved = await request(`/staff/products/${product.id}/images`, {
         method: 'POST',
@@ -115,14 +135,21 @@ export default function ProductForm({ session }) {
       event.target.value = ''
     } catch (err) {
       setError(err.message)
+      event.target.value = ''
+    } finally {
+      setUploading(false)
     }
   }
 
   async function tagImage(image, colorId) {
+    if (!colorId) {
+      setError('Each photo needs a color.')
+      return
+    }
     const saved = await request(`/staff/products/${product.id}/images/${image.id}`, {
       method: 'PATCH',
       token: session.token,
-      body: { color_id: colorId || null, is_primary: image.is_primary },
+      body: { color_id: colorId, is_primary: image.is_primary },
     })
     setProduct(saved)
   }
@@ -144,6 +171,21 @@ export default function ProductForm({ session }) {
     setProduct(saved)
   }
 
+  async function removeShirt() {
+    if (!product) return
+    if (!window.confirm('Delete this shirt and remove its photos from Cloudinary?')) return
+    setBusy(true)
+    setError('')
+    try {
+      await request(`/staff/products/${product.id}`, { method: 'DELETE', token: session.token })
+      navigate('/staff/products')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div className="dash product-edit">
       <header className="dash-head">
@@ -157,40 +199,60 @@ export default function ProductForm({ session }) {
               </>
             ) : null}
           </p>
-          <h1>{isNew ? 'New shirt' : form.name || 'Edit shirt'}</h1>
-          <p>{isNew ? 'Create a draft, then add photos before publishing.' : 'Update details, stock, and photos.'}</p>
+          <h1>{isNew ? 'New shirt' : form.name || (canWrite ? 'Edit shirt' : 'Shirt')}</h1>
+          <p>
+            {isNew
+              ? 'Create a draft, then add photos before publishing.'
+              : canWrite
+                ? 'Update details, stock, and photos.'
+                : 'Read-only. Managers change stock, photos, and publish status.'}
+          </p>
         </div>
+        {product && canDelete ? (
+          <div className="dash-tools">
+            <button type="button" className="btn ghost" onClick={removeShirt} disabled={busy}>
+              Delete shirt
+            </button>
+          </div>
+        ) : null}
       </header>
 
       {error ? <p className="error">{error}</p> : null}
 
       <form className="edit-card" onSubmit={saveBasics}>
-        <ShirtEditorFields
-          form={form}
-          onChange={setForm}
-          palette={palette}
-          showQty={isNew}
-          session={session}
-          onPaletteChange={setPalette}
-        />
-        {!isNew ? (
-          <label className="publish-toggle">
-            <input type="checkbox" checked={published} onChange={(event) => setPublished(event.target.checked)} />
-            Published on the store
-          </label>
-        ) : (
-          <p className="muted">Save first, then add images, then publish.</p>
-        )}
-        <button className="btn" type="submit" disabled={busy}>
-          {busy ? 'Saving…' : isNew ? 'Create shirt' : 'Save details'}
-        </button>
+        <fieldset disabled={!canWrite}>
+          <ShirtEditorFields
+            form={form}
+            onChange={setForm}
+            palette={palette}
+            showQty={isNew}
+            session={canWrite ? session : null}
+            onPaletteChange={setPalette}
+            disabled={!canWrite}
+          />
+          {!isNew ? (
+            <label className="publish-toggle">
+              <input type="checkbox" checked={published} onChange={(event) => setPublished(event.target.checked)} />
+              Published on the store
+            </label>
+          ) : (
+            <p className="muted">Save first, then add images, then publish.</p>
+          )}
+          {canWrite ? (
+            <button className="btn" type="submit" disabled={busy}>
+              {busy ? 'Saving…' : isNew ? 'Create shirt' : 'Save details'}
+            </button>
+          ) : null}
+        </fieldset>
       </form>
 
       {product ? (
         <>
           <form className="edit-card" onSubmit={saveStock}>
             <p className="form-kicker">Stock on hand</p>
-            <p className="muted qty-hint">Adjust units after a delivery or a count.</p>
+            <p className="muted qty-hint">
+              {canWrite ? 'Adjust units after a delivery or a count.' : 'Units currently on hand.'}
+            </p>
             <div className="qty-board">
               {form.colorIds.map((colorId) => (
                 <div className="qty-group" key={colorId}>
@@ -206,6 +268,7 @@ export default function ProductForm({ session }) {
                           type="number"
                           inputMode="numeric"
                           min="0"
+                          disabled={!canWrite}
                           value={form.qty[`${colorId}:${size}`] ?? '0'}
                           onChange={(event) =>
                             setForm({ ...form, qty: { ...form.qty, [`${colorId}:${size}`]: event.target.value } })
@@ -217,46 +280,126 @@ export default function ProductForm({ session }) {
                 </div>
               ))}
             </div>
-            <button className="btn ghost" type="submit">
-              Save stock
-            </button>
+            {canWrite ? (
+              <button className="btn ghost" type="submit">
+                Save stock
+              </button>
+            ) : null}
           </form>
 
           <section className="edit-card">
             <p className="form-kicker">Photos</p>
-            <p className="muted qty-hint">JPEG, PNG or WebP. Tag a photo to a color so the gallery follows the swatch.</p>
-            <label className="upload-btn">
-              <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={upload} />
-              Add photos
-            </label>
-            <div className="image-grid">
-              {product.images.map((image) => (
-                <article className="image-card" key={image.id}>
-                  <img src={image.url} alt={image.alt_text} />
-                  <div className="image-card-body">
-                    <select value={image.color_id || ''} onChange={(event) => tagImage(image, event.target.value)}>
-                      <option value="">All colors</option>
-                      {product.colors.map((color) => (
-                        <option key={color.id} value={color.id}>
-                          {color.name}
-                        </option>
-                      ))}
-                    </select>
-                    {image.is_primary ? <span className="badge">Primary</span> : null}
-                    <div className="row-actions">
-                      {!image.is_primary ? (
-                        <button type="button" className="btn ghost" onClick={() => makePrimary(image)}>
-                          Primary
-                        </button>
-                      ) : null}
-                      <button type="button" className="btn ghost" onClick={() => removeImage(image)}>
-                        Remove
-                      </button>
-                    </div>
+            <p className="muted qty-hint">
+              {canWrite
+                ? 'JPEG, PNG or WebP. Pick a colour first, then add as many photos as you need for that colour.'
+                : 'Photos grouped by colour.'}
+            </p>
+            {canWrite ? (
+              <>
+                <p className="field-label">Colour for new photos</p>
+                <div className="choice-row" role="group" aria-label="Upload colour">
+                  {product.colors.map((color) => (
+                    <button
+                      key={color.id}
+                      type="button"
+                      className={`choice-chip${uploadColor === color.id ? ' on' : ''}`}
+                      aria-pressed={uploadColor === color.id}
+                      onClick={() => setUploadColor(color.id)}
+                    >
+                      <span className="swatch" style={{ background: color.hex }} />
+                      {color.name}
+                    </button>
+                  ))}
+                </div>
+                <label className={`upload-btn${uploading || !uploadColor ? ' disabled' : ''}`}>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    multiple
+                    disabled={uploading || !uploadColor}
+                    onChange={upload}
+                  />
+                  {uploading ? 'Uploading…' : 'Add photos'}
+                </label>
+              </>
+            ) : null}
+            {product.colors.map((color) => {
+              const shots = product.images.filter((image) => image.color_id === color.id)
+              return (
+                <div className="image-group" key={color.id}>
+                  <div className="qty-group-head">
+                    <span className="swatch" style={{ background: color.hex }} />
+                    <strong>{color.name}</strong>
+                    <span className="muted">{shots.length} photo{shots.length === 1 ? '' : 's'}</span>
                   </div>
-                </article>
-              ))}
-            </div>
+                  {shots.length ? (
+                    <div className="image-grid">
+                      {shots.map((image) => (
+                        <article className="image-card" key={image.id}>
+                          <img src={image.url} alt={image.alt_text} />
+                          <div className="image-card-body">
+                            {canWrite ? (
+                              <select value={image.color_id || ''} onChange={(event) => tagImage(image, event.target.value)}>
+                                {!image.color_id ? <option value="">Choose colour</option> : null}
+                                {product.colors.map((option) => (
+                                  <option key={option.id} value={option.id}>
+                                    {option.name}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : null}
+                            {image.is_primary ? <span className="badge">Primary</span> : null}
+                            {canWrite ? (
+                              <div className="row-actions">
+                                {!image.is_primary ? (
+                                  <button type="button" className="btn ghost" onClick={() => makePrimary(image)}>
+                                    Primary
+                                  </button>
+                                ) : null}
+                                <button type="button" className="btn ghost" onClick={() => removeImage(image)}>
+                                  Remove
+                                </button>
+                              </div>
+                            ) : null}
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="muted">No photos for this colour yet.</p>
+                  )}
+                </div>
+              )
+            })}
+            {canWrite && product.images.some((image) => !image.color_id) ? (
+              <div className="image-group">
+                <div className="qty-group-head">
+                  <strong>Needs a colour</strong>
+                </div>
+                <div className="image-grid">
+                  {product.images
+                    .filter((image) => !image.color_id)
+                    .map((image) => (
+                      <article className="image-card" key={image.id}>
+                        <img src={image.url} alt={image.alt_text} />
+                        <div className="image-card-body">
+                          <select value="" onChange={(event) => tagImage(image, event.target.value)}>
+                            <option value="">Choose colour</option>
+                            {product.colors.map((option) => (
+                              <option key={option.id} value={option.id}>
+                                {option.name}
+                              </option>
+                            ))}
+                          </select>
+                          <button type="button" className="btn ghost" onClick={() => removeImage(image)}>
+                            Remove
+                          </button>
+                        </div>
+                      </article>
+                    ))}
+                </div>
+              </div>
+            ) : null}
           </section>
         </>
       ) : null}

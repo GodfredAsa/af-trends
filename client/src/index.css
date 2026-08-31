@@ -2699,6 +2699,13 @@ textarea {
   margin-bottom: 16px;
 }
 
+.edit-card fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
 .edit-back {
   margin: 0 0 6px;
   font-size: 0.85rem;
@@ -2735,6 +2742,19 @@ textarea {
 
 .upload-btn input {
   display: none;
+}
+
+.upload-btn.disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.image-group {
+  margin-top: 18px;
+}
+
+.image-group .qty-group-head {
+  margin-bottom: 10px;
 }
 
 .image-grid {
@@ -3074,6 +3094,78 @@ textarea {
     width: 100%;
     height: 180px;
   }
+}
+
+.control-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.privilege-table {
+  min-width: 640px;
+}
+
+.privilege-table .priv-id {
+  display: block;
+  font-size: 0.78rem;
+  margin-top: 2px;
+}
+
+.privilege-table th.focus-col,
+.privilege-table td.focus-col {
+  background: rgba(255, 87, 34, 0.04);
+}
+
+.priv-group th {
+  padding-top: 18px;
+  color: #2a3b30;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-bottom-color: transparent;
+}
+
+.priv-switch {
+  min-width: 78px;
+  height: 34px;
+  padding: 0 8px 0 4px;
+  border: 0;
+  border-radius: 999px;
+  background: #d8ddd6;
+  color: #4a5348;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.priv-switch .priv-knob {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(42, 59, 48, 0.2);
+}
+
+.priv-switch.on {
+  background: #2a3b30;
+  color: #ffffff;
+  flex-direction: row-reverse;
+}
+
+.priv-switch:disabled {
+  opacity: 0.72;
+  cursor: default;
+}
+
+.control-center .shirts-empty {
+  padding-bottom: 24px;
 }
 
 @media (min-width: 720px) {

@@ -24,6 +24,7 @@ class UserOut(OrmModel):
     role: str
     is_active: bool = True
     created_at: datetime | None = None
+    privileges: list[str] = Field(default_factory=list)
 
 
 class RegisterRequest(BaseModel):
@@ -363,6 +364,8 @@ class OrderOut(BaseModel):
     customer_note: str = ""
     created_at: datetime
     updated_at: datetime
+    can_delete: bool = False
+    deletable_after: datetime | None = None
 
 
 class StatusPatch(BaseModel):
@@ -410,3 +413,21 @@ class SettingsPatch(BaseModel):
     currency: str | None = None
     cod_instructions: str | None = None
     low_stock_threshold: int | None = Field(default=None, ge=0)
+
+
+class PrivilegeItem(BaseModel):
+    id: str
+    label: str
+    group: str
+
+
+class PrivilegeMatrixOut(BaseModel):
+    roles: list[str]
+    privileges: list[PrivilegeItem]
+    matrix: dict[str, dict[str, bool]]
+    locked: dict[str, list[str]]
+    can_edit: bool
+
+
+class PrivilegeMatrixPatch(BaseModel):
+    matrix: dict[str, dict[str, bool]]

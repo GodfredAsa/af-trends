@@ -2,29 +2,19 @@ from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
 from app.deps import CurrentUser, DbSession
-from app.models import User, UserRole
+from app.models import STAFF_ROLES, User, UserRole
+from app.privileges import Priv, has_priv
 from app.schemas import LoginRequest, ProfileUpdate, RegisterRequest, TokenResponse, UserOut
 from app.security import create_access_token, hash_password, verify_password
+from app.serializers import user_out
 
 router = APIRouter()
-
-
-def _user_out(user: User) -> UserOut:
-    return UserOut(
-        id=user.id,
-        email=user.email,
-        full_name=user.full_name,
-        phone=user.phone,
-        role=user.role,
-        is_active=user.is_active,
-        created_at=user.created_at,
-    )
 
 
 def _token(user: User) -> TokenResponse:
     return TokenResponse(
         access_token=create_access_token(str(user.id), user.email),
-        user=_user_out(user),
+        user=user_out(user),
     )
 
 
@@ -52,12 +42,17 @@ def login(payload: LoginRequest, db: DbSession) -> TokenResponse:
     user = db.scalar(select(User).where(User.email == payload.email.lower().strip()))
     if user is None or not user.is_active or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password.")
+    if user.role in {role.value for role in STAFF_ROLES} and not has_priv(user.role, Priv.STAFF_LOGIN):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This role is not allowed to sign in.",
+        )
     return _token(user)
 
 
 @router.get("/me", response_model=UserOut)
 def read_me(user: CurrentUser) -> UserOut:
-    return _user_out(user)
+    return user_out(user)
 
 
 @router.patch("/me", response_model=UserOut)
@@ -71,4 +66,4 @@ def update_me(payload: ProfileUpdate, user: CurrentUser, db: DbSession) -> UserO
     db.add(user)
     db.commit()
     db.refresh(user)
-    return _user_out(user)
+    return user_out(user)

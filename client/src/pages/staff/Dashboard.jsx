@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { money, request, statusLabel } from '../../api.js'
+import { PRIV, can } from '../../privileges.js'
 import { IconBell, IconChat, IconCheck, IconFingerprint, IconSearch } from '../../components/Icons.jsx'
 
 function amount(value) {
@@ -125,9 +126,8 @@ function initials(name) {
 
 export default function StaffDashboard({ session }) {
   const navigate = useNavigate()
-  const role = session.user.role
-  const isAdmin = role === 'superadmin'
-  const canCatalog = role === 'manager' || isAdmin
+  const isAdmin = can(session.user, PRIV.USERS_MANAGE)
+  const canCatalog = can(session.user, PRIV.CATALOG_READ)
   const [orders, setOrders] = useState([])
   const [products, setProducts] = useState([])
   const [users, setUsers] = useState([])

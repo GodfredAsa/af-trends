@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { money, request, statusLabel } from '../../api.js'
+import { PRIV, can } from '../../privileges.js'
 
 const NEXT = {
   support: {
@@ -21,11 +22,14 @@ NEXT.superadmin = NEXT.manager
 
 export default function StaffOrderDetail({ session }) {
   const { id } = useParams()
+  const navigate = useNavigate()
   const [order, setOrder] = useState(null)
   const [note, setNote] = useState('')
   const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
   const role = session.user.role
-  const canPay = role === 'manager' || role === 'superadmin'
+  const canPay = can(session.user, PRIV.ORDERS_COLLECT)
+  const canDeleteOrder = can(session.user, PRIV.ORDERS_DELETE)
 
   function load() {
     request(`/staff/orders/${id}`, { token: session.token })
@@ -76,8 +80,24 @@ export default function StaffOrderDetail({ session }) {
     }
   }
 
+  async function removeOrder() {
+    if (!window.confirm('Delete this order permanently?')) return
+    setBusy(true)
+    setError('')
+    try {
+      await request(`/staff/orders/${id}`, { method: 'DELETE', token: session.token })
+      navigate('/staff/orders')
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   if (!order) return <p className="muted">{error || 'Loading…'}</p>
   const actions = NEXT[role]?.[order.status] || []
+  const waitingDelete =
+    canDeleteOrder && (order.status === 'delivered' || order.status === 'cancelled') && !order.can_delete
 
   return (
     <div>
@@ -122,7 +142,18 @@ export default function StaffOrderDetail({ session }) {
             Cash collected
           </button>
         ) : null}
+        {canDeleteOrder && order.can_delete ? (
+          <button type="button" className="btn ghost" onClick={removeOrder} disabled={busy}>
+            {busy ? 'Deleting…' : 'Delete order'}
+          </button>
+        ) : null}
       </div>
+      {waitingDelete && order.deletable_after ? (
+        <p className="muted">
+          This {statusLabel(order.status)} order can be deleted after{' '}
+          {new Date(order.deletable_after).toLocaleString()}.
+        </p>
+      ) : null}
       <h2>Notes</h2>
       {order.notes?.map((row) => (
         <p key={row.id} className="muted">

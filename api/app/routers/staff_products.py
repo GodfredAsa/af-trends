@@ -6,8 +6,8 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import selectinload
 
 from app.catalog import ensure_colors, ensure_sizes, ensure_variant_grid
-from app.deps import CatalogEditor, DbSession, Pagination
-from app.media import MAX_FILES, save_upload, slugify
+from app.deps import CatalogDeleter, CatalogEditor, CatalogReader, DbSession, Pagination, PaletteEditor
+from app.media import MAX_FILES, destroy_upload, save_upload, slugify
 from app.models import ColorPalette, OrderItem, Product, ProductColor, ProductImage, ProductSize, SIZES, Variant
 from app.schemas import ColorCreate, ColorOut, ImagePatch, ProductCreate, ProductOut, ProductPatch, VariantStockPut
 from app.serializers import color_out, page, product_list_item, product_out
@@ -47,7 +47,7 @@ def _unique_slug(db: DbSession, slug: str, ignore_id=None) -> str:
 
 @router.get("/products")
 def list_products(
-    _user: CatalogEditor,
+    _user: CatalogReader,
     db: DbSession,
     pagination: Pagination,
     q: str | None = None,
@@ -104,7 +104,7 @@ def create_product(payload: ProductCreate, _user: CatalogEditor, db: DbSession) 
 
 
 @router.get("/products/{product_id}", response_model=ProductOut)
-def get_product(product_id: UUID, _user: CatalogEditor, db: DbSession) -> ProductOut:
+def get_product(product_id: UUID, _user: CatalogReader, db: DbSession) -> ProductOut:
     return product_out(_get_product(db, product_id), db)
 
 
@@ -161,8 +161,10 @@ def _assert_can_drop_variants(db, product: Product, color_ids, sizes) -> None:
 
 
 @router.delete("/products/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_product(product_id: UUID, _user: CatalogEditor, db: DbSession) -> None:
+def delete_product(product_id: UUID, _user: CatalogDeleter, db: DbSession) -> None:
     product = _get_product(db, product_id)
+    for image in list(product.images):
+        destroy_upload(getattr(image, "public_id", "") or "")
     product.is_published = False
     product.deleted_at = datetime.now(timezone.utc)
     db.add(product)
@@ -175,7 +177,7 @@ def upload_images(
     _user: CatalogEditor,
     db: DbSession,
     files: list[UploadFile] = File(...),
-    color_id: str | None = Form(default=None),
+    color_id: str = Form(...),
     alt_text: str = Form(default=""),
 ) -> ProductOut:
     product = _get_product(db, product_id)
@@ -183,16 +185,23 @@ def upload_images(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Choose at least one image.")
     if len(files) > MAX_FILES:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Upload 12 images or fewer per request.")
-    parsed_color = UUID(color_id) if color_id else None
-    if parsed_color and db.get(ColorPalette, parsed_color) is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown color.")
+    if not color_id.strip():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Select a color for these photos.")
+    try:
+        parsed_color = UUID(color_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid color.") from exc
+    product_color_ids = {link.color_id for link in product.color_links}
+    if parsed_color not in product_color_ids:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Pick a color that belongs to this shirt.")
     start = max((image.sort_order for image in product.images), default=-1) + 1
     make_primary = len(product.images) == 0
     for index, upload in enumerate(files):
-        url = save_upload(product.id, upload)
+        url, public_id = save_upload(product.id, upload)
         product.images.append(
             ProductImage(
                 url=url,
+                public_id=public_id,
                 alt_text=alt_text or upload.filename or product.name,
                 sort_order=start + index,
                 is_primary=make_primary and index == 0,
@@ -215,6 +224,11 @@ def patch_image(product_id: UUID, image_id: UUID, payload: ImagePatch, _user: Ca
     if payload.sort_order is not None:
         image.sort_order = payload.sort_order
     if payload.color_id is not None or "color_id" in payload.model_fields_set:
+        if payload.color_id is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Each photo needs a color.")
+        product_color_ids = {link.color_id for link in product.color_links}
+        if payload.color_id not in product_color_ids:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Pick a color that belongs to this shirt.")
         image.color_id = payload.color_id
     if payload.is_primary:
         for row in product.images:
@@ -236,6 +250,7 @@ def delete_image(product_id: UUID, image_id: UUID, _user: CatalogEditor, db: DbS
             detail="Unpublish the shirt before removing the last image.",
         )
     was_primary = image.is_primary
+    destroy_upload(getattr(image, "public_id", "") or "")
     db.delete(image)
     db.flush()
     if was_primary:
@@ -265,7 +280,7 @@ def put_variants(product_id: UUID, payload: VariantStockPut, _user: CatalogEdito
 
 
 @router.get("/palette/colors")
-def list_palette(_user: CatalogEditor, db: DbSession):
+def list_palette(_user: CatalogReader, db: DbSession):
     rows = db.scalars(select(ColorPalette).order_by(ColorPalette.sort_order, ColorPalette.name)).all()
     return {"items": [color_out(row) for row in rows]}
 
@@ -282,7 +297,7 @@ def _normalize_hex(value: str) -> str:
 
 
 @router.post("/palette/colors", response_model=ColorOut, status_code=status.HTTP_201_CREATED)
-def add_color(payload: ColorCreate, _user: CatalogEditor, db: DbSession) -> ColorOut:
+def add_color(payload: ColorCreate, _user: PaletteEditor, db: DbSession) -> ColorOut:
     name = payload.name.strip()
     hex_value = _normalize_hex(payload.hex)
     exists = db.scalar(select(ColorPalette.id).where(ColorPalette.name.ilike(name)))
@@ -300,5 +315,5 @@ def add_color(payload: ColorCreate, _user: CatalogEditor, db: DbSession) -> Colo
 
 
 @router.get("/palette/sizes")
-def list_sizes(_user: CatalogEditor):
+def list_sizes(_user: CatalogReader):
     return {"items": SIZES}

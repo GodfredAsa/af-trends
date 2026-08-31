@@ -4,11 +4,11 @@ from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import or_, select
 from sqlalchemy.orm import selectinload
 
-from app.deps import ManagerPlus, StaffUser, DbSession, Pagination
+from app.deps import OrderCollector, OrderDeleter, StaffUser, DbSession, Pagination
 from app.models import Order, OrderEvent, OrderNote, OrderStatus, PaymentStatus, User, Variant
 from app.order_machine import assert_transition, should_deduct, should_restore
 from app.schemas import NoteIn, OrderOut, PaymentPatch, StatusPatch
-from app.serializers import order_out
+from app.serializers import can_purge_order, order_out, order_purge_at
 
 router = APIRouter()
 
@@ -103,7 +103,7 @@ def patch_status(order_id: UUID, payload: StatusPatch, user: StaffUser, db: DbSe
 
 
 @router.patch("/orders/{order_id}/payment", response_model=OrderOut)
-def patch_payment(order_id: UUID, payload: PaymentPatch, _user: ManagerPlus, db: DbSession) -> OrderOut:
+def patch_payment(order_id: UUID, payload: PaymentPatch, _user: OrderCollector, db: DbSession) -> OrderOut:
     order = _get(db, order_id)
     if order.status != OrderStatus.delivered.value:
         raise HTTPException(
@@ -123,6 +123,25 @@ def patch_payment(order_id: UUID, payload: PaymentPatch, _user: ManagerPlus, db:
     )
     db.commit()
     return order_out(_get(db, order.id), include_staff=True)
+
+
+@router.delete("/orders/{order_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_order(order_id: UUID, _user: OrderDeleter, db: DbSession) -> None:
+    order = _get(db, order_id)
+    if order.status not in {"delivered", "cancelled"}:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Only delivered or cancelled orders can be deleted.",
+        )
+    if not can_purge_order(order):
+        after = order_purge_at(order)
+        when = after.isoformat() if after else "two days after completion"
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"This order can be deleted after {when}.",
+        )
+    db.delete(order)
+    db.commit()
 
 
 @router.post("/orders/{order_id}/notes", response_model=OrderOut)

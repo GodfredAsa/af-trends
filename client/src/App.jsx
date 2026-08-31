@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
-import { useState } from 'react'
-import { isStaff, readSession, writeSession } from './api.js'
+import { useEffect, useState } from 'react'
+import { isStaff, readSession, request, writeSession } from './api.js'
+import { PRIV, can } from './privileges.js'
 import StoreLayout from './components/StoreLayout.jsx'
 import StaffLayout from './components/StaffLayout.jsx'
 import LandingPage from './pages/LandingPage.jsx'
@@ -20,6 +21,7 @@ import ProductForm from './pages/staff/ProductForm.jsx'
 import StaffUsers from './pages/staff/StaffUsers.jsx'
 import StaffSettings from './pages/staff/StaffSettings.jsx'
 import StaffStock from './pages/staff/StaffStock.jsx'
+import StaffControlCenter from './pages/staff/StaffControlCenter.jsx'
 
 function ClientOnly({ session, children }) {
   if (!session) return <Navigate to="/login" replace />
@@ -27,15 +29,28 @@ function ClientOnly({ session, children }) {
   return children
 }
 
-function StaffOnly({ session, children, roles }) {
+function StaffOnly({ session, children, roles, priv }) {
   if (!session) return <Navigate to="/login" replace />
   if (!isStaff(session.user.role)) return <Navigate to="/" replace />
+  if (priv && !can(session.user, priv)) return <Navigate to="/staff" replace />
   if (roles && !roles.includes(session.user.role)) return <Navigate to="/staff" replace />
   return children
 }
 
 export default function App() {
   const [session, setSession] = useState(readSession)
+
+  useEffect(() => {
+    const current = readSession()
+    if (!current?.token) return
+    request('/auth/me', { token: current.token })
+      .then((user) => {
+        const next = { ...current, user }
+        writeSession(next)
+        setSession(next)
+      })
+      .catch(() => {})
+  }, [])
 
   function handleLogin(next) {
     writeSession(next)
@@ -45,6 +60,14 @@ export default function App() {
   function handleLogout() {
     writeSession(null)
     setSession(null)
+  }
+
+  function handleUser(user) {
+    const current = readSession()
+    if (!current?.token || !user) return
+    const next = { ...current, user }
+    writeSession(next)
+    setSession(next)
   }
 
   return (
@@ -109,7 +132,7 @@ export default function App() {
         <Route
           path="products"
           element={
-            <StaffOnly session={session} roles={['manager', 'superadmin']}>
+            <StaffOnly session={session} priv={PRIV.CATALOG_READ}>
               <StaffProducts session={session} />
             </StaffOnly>
           }
@@ -117,7 +140,7 @@ export default function App() {
         <Route
           path="products/:id"
           element={
-            <StaffOnly session={session} roles={['manager', 'superadmin']}>
+            <StaffOnly session={session} priv={PRIV.CATALOG_READ}>
               <ProductForm session={session} />
             </StaffOnly>
           }
@@ -125,7 +148,7 @@ export default function App() {
         <Route
           path="stock"
           element={
-            <StaffOnly session={session} roles={['manager', 'superadmin']}>
+            <StaffOnly session={session} priv={PRIV.CATALOG_READ}>
               <StaffStock session={session} />
             </StaffOnly>
           }
@@ -133,15 +156,19 @@ export default function App() {
         <Route
           path="users"
           element={
-            <StaffOnly session={session} roles={['superadmin']}>
-              <StaffUsers session={session} />
+            <StaffOnly session={session} priv={PRIV.USERS_MANAGE}>
+              <StaffUsers session={session} onUser={handleUser} />
             </StaffOnly>
           }
         />
         <Route
+          path="control"
+          element={<StaffControlCenter session={session} onUser={handleUser} />}
+        />
+        <Route
           path="settings"
           element={
-            <StaffOnly session={session} roles={['superadmin']}>
+            <StaffOnly session={session} priv={PRIV.SETTINGS_MANAGE}>
               <StaffSettings session={session} />
             </StaffOnly>
           }
