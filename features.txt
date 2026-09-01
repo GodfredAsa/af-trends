@@ -160,15 +160,15 @@ RBAC on the client
 
 README v1 called for dark gray + white with no accent. The live store uses the later NovaTrend-style mock.
 
-[x]  White page, black type, orange #FF5722, wells #F8F8F8
+[x]  White page, black type, forest #2A3B30, wells #F8F8F8
 [x]  Black announcement bar
 [x]  Header: logo, Home / Shop / New Arrivals / Best Sellers / Categories
 [x]  Header tools: search, heart, account, cart badge
 [x]  Hero, category tiles, arrivals carousel, bestsellers, flash-sale + collection banners
 [x]  Real clothing photos (catalog JPEGs), not SVG shirt drawings
-[x]  Pill CTAs; orange primary; black Quick add
+[x]  Pill CTAs; forest primary; black Quick add
 [x]  Product swatches + size picker
-[ ]  Dark gray + white chrome from README §5   (replaced by orange/white)
+[ ]  Dark gray + white chrome from README §5   (replaced by forest/white)
 [ ]  Landing search / color / size / sort filters  (removed from All tees)
 [ ]  Header search does not filter the catalog (filters UI removed)
 [ ]  Image reorder controls on the product form (sort_order is on the API)

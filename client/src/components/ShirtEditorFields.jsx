@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { request } from '../api.js'
+import { PRIV, can } from '../privileges.js'
 
 export const ALL_SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL']
 
@@ -39,6 +40,7 @@ export default function ShirtEditorFields({
   disabled = false,
 }) {
   const colorMap = Object.fromEntries(palette.map((color) => [color.id, color]))
+  const canManagePalette = can(session?.user, PRIV.SETTINGS_MANAGE)
   const [newName, setNewName] = useState('')
   const [newHex, setNewHex] = useState('#2A3B30')
   const [colorError, setColorError] = useState('')
@@ -70,6 +72,17 @@ export default function ShirtEditorFields({
       setColorError(err.message)
     } finally {
       setSavingColor(false)
+    }
+  }
+
+  async function removePaletteColor(color) {
+    if (!window.confirm(`Remove ${color.name} from the palette?`)) return
+    setColorError('')
+    try {
+      await request(`/staff/palette/colors/${color.id}`, { method: 'DELETE', token: session.token })
+      onPaletteChange?.((palette || []).filter((item) => item.id !== color.id))
+    } catch (err) {
+      setColorError(err.message)
     }
   }
 
@@ -138,17 +151,28 @@ export default function ShirtEditorFields({
           {palette.map((color) => {
             const on = form.colorIds.includes(color.id)
             return (
-              <button
-                key={color.id}
-                type="button"
-                className={`choice-chip${on ? ' on' : ''}`}
-                aria-pressed={on}
-                disabled={disabled}
-                onClick={() => toggle('colorIds', color.id)}
-              >
-                <span className="swatch" style={{ background: color.hex }} />
-                {color.name}
-              </button>
+              <span key={color.id} className={`choice-chip-wrap${on ? ' on' : ''}`}>
+                <button
+                  type="button"
+                  className={`choice-chip${on ? ' on' : ''}`}
+                  aria-pressed={on}
+                  disabled={disabled}
+                  onClick={() => toggle('colorIds', color.id)}
+                >
+                  <span className="swatch" style={{ background: color.hex }} />
+                  {color.name}
+                </button>
+                {!on && canManagePalette && !disabled ? (
+                  <button
+                    type="button"
+                    className="chip-delete"
+                    aria-label={`Delete ${color.name}`}
+                    onClick={() => removePaletteColor(color)}
+                  >
+                    ×
+                  </button>
+                ) : null}
+              </span>
             )
           })}
         </div>

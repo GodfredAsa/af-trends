@@ -56,11 +56,17 @@ class ColorOut(OrmModel):
     name: str
     hex: str
     sort_order: int = 0
+    in_use: bool = False
 
 
 class ColorCreate(BaseModel):
     name: str = Field(min_length=1, max_length=64)
     hex: str = Field(min_length=4, max_length=7)
+
+
+class ColorPatch(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=64)
+    hex: str | None = Field(default=None, min_length=4, max_length=7)
 
 
 class SizeListOut(BaseModel):

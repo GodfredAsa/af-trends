@@ -61,8 +61,8 @@ def variant_price(variant: Variant) -> Decimal:
     return as_money(variant.product.base_price)
 
 
-def color_out(color: ColorPalette) -> ColorOut:
-    return ColorOut(id=color.id, name=color.name, hex=color.hex, sort_order=color.sort_order)
+def color_out(color: ColorPalette, in_use: bool = False) -> ColorOut:
+    return ColorOut(id=color.id, name=color.name, hex=color.hex, sort_order=color.sort_order, in_use=in_use)
 
 
 def image_out(image: ProductImage) -> ImageOut:

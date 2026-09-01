@@ -6,10 +6,10 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import selectinload
 
 from app.catalog import ensure_colors, ensure_sizes, ensure_variant_grid
-from app.deps import CatalogDeleter, CatalogEditor, CatalogReader, DbSession, Pagination, PaletteEditor
+from app.deps import CatalogDeleter, CatalogEditor, CatalogReader, DbSession, Pagination, PaletteEditor, SuperadminUser
 from app.media import MAX_FILES, destroy_upload, save_upload, slugify
-from app.models import ColorPalette, OrderItem, Product, ProductColor, ProductImage, ProductSize, SIZES, Variant
-from app.schemas import ColorCreate, ColorOut, ImagePatch, ProductCreate, ProductOut, ProductPatch, VariantStockPut
+from app.models import CartItem, ColorPalette, OrderItem, Product, ProductColor, ProductImage, ProductSize, SIZES, Variant
+from app.schemas import ColorCreate, ColorOut, ColorPatch, ImagePatch, ProductCreate, ProductOut, ProductPatch, VariantStockPut
 from app.serializers import color_out, page, product_list_item, product_out
 
 router = APIRouter()
@@ -282,7 +282,8 @@ def put_variants(product_id: UUID, payload: VariantStockPut, _user: CatalogEdito
 @router.get("/palette/colors")
 def list_palette(_user: CatalogReader, db: DbSession):
     rows = db.scalars(select(ColorPalette).order_by(ColorPalette.sort_order, ColorPalette.name)).all()
-    return {"items": [color_out(row) for row in rows]}
+    selected = set(db.scalars(select(ProductColor.color_id)).all())
+    return {"items": [color_out(row, in_use=row.id in selected) for row in rows]}
 
 
 def _normalize_hex(value: str) -> str:
@@ -312,6 +313,62 @@ def add_color(payload: ColorCreate, _user: PaletteEditor, db: DbSession) -> Colo
     db.commit()
     db.refresh(color)
     return color_out(color)
+
+
+def _get_color(db: DbSession, color_id: UUID) -> ColorPalette:
+    color = db.get(ColorPalette, color_id)
+    if color is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Colour not found.")
+    return color
+
+
+@router.patch("/palette/colors/{color_id}", response_model=ColorOut)
+def patch_color(color_id: UUID, payload: ColorPatch, _user: SuperadminUser, db: DbSession) -> ColorOut:
+    color = _get_color(db, color_id)
+    if payload.name is not None:
+        name = payload.name.strip()
+        clash = db.scalar(
+            select(ColorPalette.id).where(ColorPalette.name.ilike(name), ColorPalette.id != color.id)
+        )
+        if clash:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f'"{name}" is already in the palette.',
+            )
+        color.name = name
+    if payload.hex is not None:
+        color.hex = _normalize_hex(payload.hex)
+    db.add(color)
+    db.commit()
+    db.refresh(color)
+    return color_out(color)
+
+
+@router.delete("/palette/colors/{color_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_color(color_id: UUID, _user: SuperadminUser, db: DbSession) -> None:
+    color = _get_color(db, color_id)
+    selected = db.scalar(select(ProductColor.id).where(ProductColor.color_id == color.id).limit(1))
+    if selected:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This colour is selected on a shirt. Turn it off on those shirts, then delete it.",
+        )
+    variant_ids = list(db.scalars(select(Variant.id).where(Variant.color_id == color.id)))
+    if variant_ids:
+        on_order = db.scalar(select(OrderItem.id).where(OrderItem.variant_id.in_(variant_ids)).limit(1))
+        if on_order:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="This colour is on an order, so it cannot be deleted.",
+            )
+        for item in db.scalars(select(CartItem).where(CartItem.variant_id.in_(variant_ids))).all():
+            db.delete(item)
+        for variant in db.scalars(select(Variant).where(Variant.id.in_(variant_ids))).all():
+            db.delete(variant)
+    for image in db.scalars(select(ProductImage).where(ProductImage.color_id == color.id)).all():
+        image.color_id = None
+    db.delete(color)
+    db.commit()
 
 
 @router.get("/palette/sizes")

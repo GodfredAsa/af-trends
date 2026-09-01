@@ -3,8 +3,8 @@
   --ink: #000000;
   --muted: #6b6b6b;
   --line: #ececec;
-  --accent: #ff5722;
-  --accent-hover: #e64a19;
+  --accent: #2a3b30;
+  --accent-hover: #1e2b24;
   --well: #f8f8f8;
   --radius: 16px;
   --sans: 'Inter', system-ui, sans-serif;
@@ -368,7 +368,7 @@ button:disabled {
   width: 78%;
   aspect-ratio: 1;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #ff8a65 0%, #ff5722 55%, #e64a19 100%);
+  background: radial-gradient(circle at 35% 30%, #4a6354 0%, #2a3b30 55%, #1e2b24 100%);
   right: 4%;
   top: 6%;
 }
@@ -2473,6 +2473,29 @@ textarea {
   appearance: none;
 }
 
+.choice-chip-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.choice-chip-wrap .chip-delete {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #2a3b30;
+  color: #ffffff;
+  font-size: 0.9rem;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
 .choice-chip.size {
   min-width: 48px;
   justify-content: center;
@@ -3117,7 +3140,7 @@ textarea {
 
 .privilege-table th.focus-col,
 .privilege-table td.focus-col {
-  background: rgba(255, 87, 34, 0.04);
+  background: rgba(42, 59, 48, 0.04);
 }
 
 .priv-group th {
@@ -3166,6 +3189,52 @@ textarea {
 
 .control-center .shirts-empty {
   padding-bottom: 24px;
+}
+
+.palette-admin {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.palette-admin-row,
+.palette-admin-add {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) 48px auto auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.palette-admin-add {
+  margin-top: 8px;
+}
+
+.palette-admin input[type='color'] {
+  width: 48px;
+  height: 36px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.settings-page .edit-card h2 {
+  margin: 0 0 10px;
+  font-size: 1.1rem;
+}
+
+@media (max-width: 640px) {
+  .palette-admin-row,
+  .palette-admin-add {
+    grid-template-columns: 28px 1fr 48px;
+  }
+
+  .palette-admin-row .btn,
+  .palette-admin-add .btn {
+    grid-column: span 3;
+  }
 }
 
 @media (min-width: 720px) {
