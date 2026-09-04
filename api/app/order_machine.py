@@ -43,9 +43,15 @@ def assert_transition(role: str, current: str, nxt: str) -> None:
         )
 
 
-def should_deduct(current: str, nxt: str) -> bool:
+def should_deduct(current: str, nxt: str, stock_held: bool = False) -> bool:
+    if stock_held:
+        return False
     return current == OrderStatus.pending.value and nxt == OrderStatus.confirmed.value
 
 
-def should_restore(current: str, nxt: str) -> bool:
-    return nxt == OrderStatus.cancelled.value and current in {s.value for s in STOCK_RESERVED_STATUSES}
+def should_restore(current: str, nxt: str, stock_held: bool = False) -> bool:
+    if nxt != OrderStatus.cancelled.value:
+        return False
+    if stock_held:
+        return True
+    return current in {s.value for s in STOCK_RESERVED_STATUSES}

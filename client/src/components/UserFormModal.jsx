@@ -37,7 +37,7 @@ export default function UserFormModal({ mode = 'staff', busy, error, onClose, on
   const title = isStaff ? 'New staff' : 'New customer'
   const hint = isStaff
     ? 'Managers run catalog and stock. Support handles orders.'
-    : 'A customer account can shop and pay on delivery.'
+    : 'A customer account can shop and pay before delivery.'
 
   return (
     <div className="modal-back sheet" onClick={() => !busy && onClose()} role="presentation">

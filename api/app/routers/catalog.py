@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
+from app.cart_hold import release_expired_carts
 from app.deps import DbSession, Pagination
 from app.models import ColorPalette, Product, ProductColor, ProductSize, SIZES, Variant
 from app.schemas import ProductOut, SizeListOut
@@ -31,7 +32,9 @@ def list_products(
     color_id: str | None = None,
     size: str | None = None,
     sort: str = Query("newest"),
+    is_new_arrival: bool | None = None,
 ):
+    release_expired_carts(db)
     page_num, page_size = pagination
     stmt = _published_query()
     if q:
@@ -40,6 +43,10 @@ def list_products(
         stmt = stmt.join(Product.color_links).where(ProductColor.color_id == color_id)
     if size:
         stmt = stmt.join(Product.size_links).where(ProductSize.size == size.upper())
+    if is_new_arrival is True:
+        stmt = stmt.where(Product.is_new_arrival.is_(True))
+    release_expired_carts(db)
+    db.commit()
     if sort == "price_asc":
         stmt = stmt.order_by(Product.base_price.asc())
     elif sort == "price_desc":
@@ -56,6 +63,7 @@ def list_products(
 
 @router.get("/catalog/products/{slug}", response_model=ProductOut)
 def get_product(slug: str, db: DbSession) -> ProductOut:
+    release_expired_carts(db)
     product = db.scalar(_published_query().where(Product.slug == slug))
     if product is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shirt not found.")

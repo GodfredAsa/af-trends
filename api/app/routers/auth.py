@@ -1,6 +1,9 @@
-from fastapi import APIRouter, HTTPException, status
+from typing import Annotated
+
+from fastapi import APIRouter, Header, HTTPException, status
 from sqlalchemy import select
 
+from app.cart_hold import merge_guest_cart
 from app.deps import CurrentUser, DbSession
 from app.models import STAFF_ROLES, User, UserRole
 from app.privileges import Priv, has_priv
@@ -9,6 +12,8 @@ from app.security import create_access_token, hash_password, verify_password
 from app.serializers import user_out
 
 router = APIRouter()
+
+CartKey = Annotated[str | None, Header(alias="X-Cart-Key")]
 
 
 def _token(user: User) -> TokenResponse:
@@ -19,7 +24,7 @@ def _token(user: User) -> TokenResponse:
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-def register(payload: RegisterRequest, db: DbSession) -> TokenResponse:
+def register(payload: RegisterRequest, db: DbSession, x_cart_key: CartKey = None) -> TokenResponse:
     email = payload.email.lower().strip()
     exists = db.scalar(select(User).where(User.email == email))
     if exists:
@@ -34,11 +39,13 @@ def register(payload: RegisterRequest, db: DbSession) -> TokenResponse:
     db.add(user)
     db.commit()
     db.refresh(user)
+    merge_guest_cart(db, user, x_cart_key)
+    db.commit()
     return _token(user)
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(payload: LoginRequest, db: DbSession) -> TokenResponse:
+def login(payload: LoginRequest, db: DbSession, x_cart_key: CartKey = None) -> TokenResponse:
     user = db.scalar(select(User).where(User.email == payload.email.lower().strip()))
     if user is None or not user.is_active or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password.")
@@ -47,6 +54,8 @@ def login(payload: LoginRequest, db: DbSession) -> TokenResponse:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This role is not allowed to sign in.",
         )
+    merge_guest_cart(db, user, x_cart_key)
+    db.commit()
     return _token(user)
 
 

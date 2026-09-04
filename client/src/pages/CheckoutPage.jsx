@@ -92,7 +92,7 @@ export default function CheckoutPage({ session }) {
   return (
     <main className="panel wide">
       <h1>Checkout</h1>
-      <p className="muted">Cash on delivery. You pay when the shirt arrives.</p>
+      <p className="muted">Payment before delivery. Pay first, then we ship nationwide.</p>
       {error ? <p className="error">{error}</p> : null}
 
       <h2>Delivery address</h2>
@@ -135,7 +135,7 @@ export default function CheckoutPage({ session }) {
       </p>
       <form onSubmit={placeOrder}>
         <button className="btn" type="submit" disabled={busy || !addressId || !zoneId}>
-          Place order · pay on delivery
+          Place order · pay before delivery
         </button>
       </form>
     </main>

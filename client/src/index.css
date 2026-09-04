@@ -3,8 +3,8 @@
   --ink: #000000;
   --muted: #6b6b6b;
   --line: #ececec;
-  --accent: #2a3b30;
-  --accent-hover: #1e2b24;
+  --accent: #191919;
+  --accent-hover: #111111;
   --well: #f8f8f8;
   --radius: 16px;
   --sans: 'Inter', system-ui, sans-serif;
@@ -106,9 +106,9 @@ button:disabled {
 
 .brand-logo {
   display: block;
-  height: 48px;
+  height: 56px;
   width: auto;
-  max-width: 170px;
+  max-width: 200px;
   object-fit: contain;
 }
 
@@ -118,8 +118,8 @@ button:disabled {
 }
 
 .footer-logo .brand-logo {
-  height: 40px;
-  max-width: 140px;
+  height: 48px;
+  max-width: 168px;
 }
 
 .auth-logo {
@@ -129,8 +129,8 @@ button:disabled {
 }
 
 .auth-logo .brand-logo {
-  height: 64px;
-  max-width: 220px;
+  height: 72px;
+  max-width: 248px;
 }
 
 .nav-links {
@@ -368,7 +368,7 @@ button:disabled {
   width: 78%;
   aspect-ratio: 1;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #4a6354 0%, #2a3b30 55%, #1e2b24 100%);
+  background: radial-gradient(circle at 35% 30%, #4a4a4a 0%, #191919 55%, #111111 100%);
   right: 4%;
   top: 6%;
 }
@@ -954,7 +954,7 @@ button:disabled {
 
 .auth-stage {
   --staff-bg: #f2f1ec;
-  --staff-forest: #2a3b30;
+  --staff-forest: #191919;
   --staff-sage: #6b8e7d;
   --staff-mint: #d9e4d7;
   --staff-ink: #1c241e;
@@ -990,8 +990,8 @@ button:disabled {
 }
 
 .auth-intro-logo .brand-logo {
-  height: 48px;
-  max-width: 180px;
+  height: 56px;
+  max-width: 210px;
   filter: invert(1);
 }
 
@@ -1240,7 +1240,7 @@ textarea {
 
 .staff {
   --staff-bg: #f2f1ec;
-  --staff-forest: #2a3b30;
+  --staff-forest: #191919;
   --staff-sage: #6b8e7d;
   --staff-mint: #d9e4d7;
   --staff-ink: #1c241e;
@@ -1286,14 +1286,14 @@ textarea {
 }
 
 .side-brand .brand-logo {
-  height: 42px;
-  max-width: 150px;
+  height: 50px;
+  max-width: 176px;
   filter: invert(1);
 }
 
 .staff.collapsed .side-brand .brand-logo {
-  height: 34px;
-  max-width: 48px;
+  height: 38px;
+  max-width: 52px;
 }
 
 .side-mark {
@@ -1388,6 +1388,31 @@ textarea {
   width: 20px;
   height: 20px;
   flex: 0 0 20px;
+}
+
+.side-icon-wrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+}
+
+.side-badge {
+  position: absolute;
+  top: -7px;
+  right: -9px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #d64545;
+  color: #ffffff;
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 16px;
+  text-align: center;
 }
 
 .side-nav a.active,
@@ -1837,17 +1862,70 @@ textarea {
 .transfers li {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 10px;
   padding: 10px 0;
   border-bottom: 1px solid #eef0ea;
 }
 
-.transfers li strong,
-.transfers li span {
+.transfers li a {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+  color: inherit;
+}
+
+.transfer-bar {
+  width: 4px;
+  border-radius: 99px;
+  background: #c5d0c8;
+  flex: 0 0 4px;
+}
+
+.transfer-bar.pending {
+  background: #d4a017;
+}
+
+.transfer-bar.confirmed,
+.transfer-bar.packed {
+  background: #3d6ea8;
+}
+
+.transfer-bar.out_for_delivery {
+  background: #6b4ca0;
+}
+
+.transfer-bar.delivered {
+  background: var(--staff-forest);
+}
+
+.transfer-bar.failed_delivery,
+.transfer-bar.cancelled {
+  background: #c45c5c;
+}
+
+.transfer-copy {
+  min-width: 0;
+}
+
+.transfer-note {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: #d64545;
+  vertical-align: middle;
+}
+
+.transfer-copy strong,
+.transfer-copy > span {
   display: block;
 }
 
-.transfers li span {
+.transfer-copy > span {
   color: #8a9188;
   font-size: 0.78rem;
 }
@@ -1972,7 +2050,7 @@ textarea {
 
 .stock-label.in_stock {
   background: #d9e4d7;
-  color: #2a3b30;
+  color: #191919;
 }
 
 .stock-label.low_stock {
@@ -2090,7 +2168,7 @@ textarea {
 
 .shirt-status.live {
   background: #d9e4d7;
-  color: #2a3b30;
+  color: #191919;
 }
 
 .shirt-status.draft {
@@ -2216,14 +2294,14 @@ textarea {
 }
 
 .status-tabs button:hover {
-  border-color: #2a3b30;
-  color: #2a3b30;
+  border-color: #191919;
+  color: #191919;
 }
 
 .status-tabs button.active {
-  background: #2a3b30;
+  background: #191919;
   color: #ffffff;
-  border-color: #2a3b30;
+  border-color: #191919;
 }
 
 .status-tabs .count {
@@ -2232,7 +2310,7 @@ textarea {
   padding: 0 6px;
   border-radius: 999px;
   background: #eef1ea;
-  color: #2a3b30;
+  color: #191919;
   font-size: 0.72rem;
   display: inline-grid;
   place-items: center;
@@ -2262,7 +2340,7 @@ textarea {
   font-weight: 700;
   text-transform: capitalize;
   background: #eef1ea;
-  color: #2a3b30;
+  color: #191919;
 }
 
 .order-chip.pending {
@@ -2284,7 +2362,7 @@ textarea {
 .order-chip.delivered,
 .order-chip.pay-paid {
   background: #d9e4d7;
-  color: #2a3b30;
+  color: #191919;
 }
 
 .order-chip.failed_delivery,
@@ -2300,6 +2378,60 @@ textarea {
 
 .order-row:hover td {
   background: #f6f7f3;
+}
+
+.order-delete-cell {
+  width: 52px;
+  text-align: right;
+  vertical-align: middle;
+}
+
+.trash-btn {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 10px;
+  background: #4a4f4c;
+  color: #f4f5f2;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(42, 47, 45, 0.22);
+  transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.trash-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.trash-btn:hover:not(:disabled) {
+  background: #2f3331;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(42, 47, 45, 0.28);
+}
+
+.trash-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.trash-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+  box-shadow: none;
+}
+
+.trash-btn.labeled {
+  width: auto;
+  min-height: 40px;
+  padding: 0 14px 0 12px;
+  gap: 8px;
+  display: inline-flex;
+  align-items: center;
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: #f4f5f2;
 }
 
 .modal-back {
@@ -2345,7 +2477,7 @@ textarea {
 }
 
 .form-modal .eyebrow {
-  color: var(--staff-forest, #2a3b30);
+  color: var(--staff-forest, #191919);
   margin: 0 0 4px;
 }
 
@@ -2401,7 +2533,7 @@ textarea {
   font-weight: 800;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--staff-forest, #2a3b30);
+  color: var(--staff-forest, #191919);
 }
 
 .field-label {
@@ -2466,7 +2598,7 @@ textarea {
   border: 1px solid #d5d8d0;
   border-radius: 999px;
   background: #ffffff;
-  color: #2a3b30;
+  color: #191919;
   font-weight: 600;
   font-size: 0.85rem;
   font-family: inherit;
@@ -2487,7 +2619,7 @@ textarea {
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: #2a3b30;
+  background: #191919;
   color: #ffffff;
   font-size: 0.9rem;
   line-height: 1;
@@ -2503,8 +2635,8 @@ textarea {
 }
 
 .choice-chip.on {
-  background: #2a3b30;
-  border-color: #2a3b30;
+  background: #191919;
+  border-color: #191919;
   color: #ffffff;
 }
 
@@ -2584,7 +2716,7 @@ textarea {
   height: 40px;
   border-radius: 50%;
   background: #d9e4d7;
-  color: #2a3b30;
+  color: #191919;
   display: grid;
   place-items: center;
   font-size: 0.72rem;
@@ -2600,18 +2732,18 @@ textarea {
   font-size: 0.75rem;
   font-weight: 700;
   background: #eef1ea;
-  color: #2a3b30;
+  color: #191919;
   text-transform: capitalize;
 }
 
 .role-chip.superadmin {
-  background: #2a3b30;
+  background: #191919;
   color: #ffffff;
 }
 
 .role-chip.manager {
   background: #d9e4d7;
-  color: #2a3b30;
+  color: #191919;
 }
 
 .role-chip.support {
@@ -2644,7 +2776,7 @@ textarea {
 
 .status-pill.live {
   background: #d9e4d7;
-  color: #2a3b30;
+  color: #191919;
 }
 
 .status-pill.draft {
@@ -2756,7 +2888,7 @@ textarea {
   min-height: 44px;
   padding: 0 16px;
   border-radius: 999px;
-  background: #2a3b30;
+  background: #191919;
   color: #ffffff;
   font-weight: 700;
   margin: 8px 0 16px;
@@ -3145,7 +3277,7 @@ textarea {
 
 .priv-group th {
   padding-top: 18px;
-  color: #2a3b30;
+  color: #191919;
   font-size: 0.72rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -3177,7 +3309,7 @@ textarea {
 }
 
 .priv-switch.on {
-  background: #2a3b30;
+  background: #191919;
   color: #ffffff;
   flex-direction: row-reverse;
 }

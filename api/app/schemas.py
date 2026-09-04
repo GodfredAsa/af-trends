@@ -131,6 +131,7 @@ class ProductListItem(BaseModel):
     cost_price: str = "0.00"
     currency: str = "GHS"
     is_published: bool = True
+    is_new_arrival: bool = False
     primary_image: ImageOut | None = None
     colors: list[ColorOut]
     sizes: list[str] = []
@@ -146,6 +147,7 @@ class ProductOut(BaseModel):
     cost_price: str = "0.00"
     currency: str = "GHS"
     is_published: bool
+    is_new_arrival: bool = False
     colors: list[ColorOut]
     sizes: list[str]
     images: list[ImageOut]
@@ -162,6 +164,7 @@ class ProductCreate(BaseModel):
     sizes: list[str] = Field(min_length=1)
     variants: list[VariantIn] | None = None
     is_published: bool = False
+    is_new_arrival: bool = False
 
 
 class ProductPatch(BaseModel):
@@ -173,6 +176,7 @@ class ProductPatch(BaseModel):
     color_ids: list[UUID] | None = None
     sizes: list[str] | None = None
     is_published: bool | None = None
+    is_new_arrival: bool | None = None
 
 
 class StockColorQty(BaseModel):
@@ -206,6 +210,7 @@ class StockCreate(BaseModel):
     sizes: list[str] = Field(min_length=1)
     variants: list[VariantIn]
     is_published: bool = False
+    is_new_arrival: bool = False
 
 
 class Page(BaseModel):
@@ -292,12 +297,14 @@ class CartItemOut(BaseModel):
     size: str
     image_url: str
     slug: str = ""
+    expires_at: datetime | None = None
 
 
 class CartOut(BaseModel):
     items: list[CartItemOut]
     subtotal: str
     currency: str = "GHS"
+    hold_hours: int = 4
 
 
 class CheckoutIn(BaseModel):

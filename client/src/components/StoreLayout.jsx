@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { NavLink, Outlet, Link, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { isStaff, request } from '../api.js'
 import { IconBag, IconHeart, IconSearch, IconUser } from './Icons.jsx'
 import Logo from './Logo.jsx'
@@ -7,19 +7,20 @@ import Logo from './Logo.jsx'
 export default function StoreLayout({ session, onLogout }) {
   const user = session?.user
   const navigate = useNavigate()
+  const location = useLocation()
   const [cartCount, setCartCount] = useState(0)
   const [searchOpen, setSearchOpen] = useState(false)
   const [query, setQuery] = useState('')
 
   useEffect(() => {
-    if (user?.role !== 'client') {
+    if (isStaff(user?.role)) {
       setCartCount(0)
       return
     }
-    request('/cart', { token: session.token })
+    request('/cart', { token: user?.role === 'client' ? session.token : undefined })
       .then((cart) => setCartCount((cart.items || []).reduce((sum, item) => sum + item.quantity, 0)))
       .catch(() => setCartCount(0))
-  }, [session, user?.role])
+  }, [session, user?.role, location.pathname])
 
   function submitSearch(event) {
     event.preventDefault()
@@ -31,9 +32,9 @@ export default function StoreLayout({ session, onLogout }) {
   return (
     <div className="store">
       <div className="announce">
-        <span>Pay on delivery nationwide</span>
+        <span>Payment before delivery</span>
         <span>Custom design tees</span>
-        <span>Ships Accra, Kumasi, and beyond</span>
+        <span>Nationwide delivery</span>
       </div>
       <header className="site-header">
         <div className="inner wrap">
@@ -73,7 +74,7 @@ export default function StoreLayout({ session, onLogout }) {
             <Link className="icon-btn" to={user ? (user.role === 'client' ? '/account/orders' : '/staff') : '/login'} aria-label="Account">
               <IconUser />
             </Link>
-            <Link className="icon-btn bag" to={user?.role === 'client' ? '/cart' : '/login'} aria-label="Cart">
+            <Link className="icon-btn bag" to={isStaff(user?.role) ? '/login' : '/cart'} aria-label="Cart">
               <IconBag />
               <span className="bag-count">{cartCount}</span>
             </Link>
@@ -85,11 +86,11 @@ export default function StoreLayout({ session, onLogout }) {
         <div className="trust wrap foot-trust">
           <div>
             <strong>Nationwide delivery</strong>
-            <span>Zones from Accra Metro out.</span>
+            <span>We deliver across Ghana.</span>
           </div>
           <div>
-            <strong>Pay on delivery</strong>
-            <span>Cash when the shirt arrives.</span>
+            <strong>Payment before delivery</strong>
+            <span>Pay first, then we ship your tee.</span>
           </div>
           <div>
             <strong>Color &amp; size</strong>
@@ -97,7 +98,7 @@ export default function StoreLayout({ session, onLogout }) {
           </div>
           <div>
             <strong>Staff support</strong>
-            <span>Every COD drop is tracked.</span>
+            <span>Every order is tracked to your door.</span>
           </div>
         </div>
         <div className="inner wrap">

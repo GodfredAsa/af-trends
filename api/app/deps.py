@@ -8,10 +8,11 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import STAFF_ROLES, User, UserRole
 from app.privileges import Priv, has_priv
-from app.security import get_current_user
+from app.security import get_current_user, get_optional_user
 
 DbSession = Annotated[Session, Depends(get_db)]
 CurrentUser = Annotated[User, Depends(get_current_user)]
+OptionalUser = Annotated[User | None, Depends(get_optional_user)]
 
 
 def require_roles(*roles: UserRole) -> Callable[[User], User]:

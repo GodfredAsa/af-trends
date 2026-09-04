@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { money, request, statusLabel } from '../../api.js'
+import { formatPlacedAt, money, request, statusLabel } from '../../api.js'
 import { PRIV, can } from '../../privileges.js'
 import { IconBell, IconChat, IconCheck, IconFingerprint, IconSearch } from '../../components/Icons.jsx'
 
@@ -64,7 +64,7 @@ function BarSpark({ values }) {
   )
 }
 
-function LineSpark({ values, stroke = '#2A3B30' }) {
+function LineSpark({ values, stroke = '#191919' }) {
   const max = Math.max(...values, 1)
   const points = values
     .map((value, index) => {
@@ -105,8 +105,8 @@ function Gauge({ percent }) {
   return (
     <svg className="gauge" viewBox="0 0 120 78" aria-hidden="true">
       <path d="M18 58 A42 42 0 0 1 102 58" fill="none" stroke="#E8EBE3" strokeWidth="10" strokeLinecap="round" />
-      <path d="M18 58 A42 42 0 0 1 102 58" fill="none" stroke="#2A3B30" strokeWidth="10" strokeLinecap="round" pathLength="100" strokeDasharray={`${clamped} 100`} />
-      <circle cx={x} cy={y} r="5" fill="#2A3B30" />
+      <path d="M18 58 A42 42 0 0 1 102 58" fill="none" stroke="#191919" strokeWidth="10" strokeLinecap="round" pathLength="100" strokeDasharray={`${clamped} 100`} />
+      <circle cx={x} cy={y} r="5" fill="#191919" />
       <text x="60" y="54" textAnchor="middle" fontSize="16" fontWeight="700" fill="#1c241e">
         {clamped}%
       </text>
@@ -325,9 +325,18 @@ export default function StaffDashboard({ session }) {
             {recent.map((order) => (
               <li key={order.id}>
                 <Link to={`/staff/orders/${order.id}`}>
-                  <strong>{order.customer.full_name}</strong>
-                  <span>
-                    {order.order_number} · {statusLabel(order.status)}
+                  <span className={`transfer-bar ${order.status}`} aria-hidden="true" />
+                  <span className="transfer-copy">
+                    <strong>
+                      {order.customer.full_name}
+                      {order.status === 'pending' ? (
+                        <span className="transfer-note" title="Needs attention" />
+                      ) : null}
+                    </strong>
+                    <span>
+                      {order.order_number} · {statusLabel(order.status)}
+                    </span>
+                    <span>Placed {formatPlacedAt(order.created_at)}</span>
                   </span>
                 </Link>
                 <em className={order.payment_status === 'paid' ? 'up' : 'down'}>

@@ -22,7 +22,7 @@ export default function RegisterPage({ onLogin }) {
       const session = { token: data.access_token, user: data.user }
       writeSession(session)
       onLogin(session)
-      navigate('/')
+      navigate('/cart')
     } catch (err) {
       setError(err.message)
     } finally {
@@ -34,7 +34,7 @@ export default function RegisterPage({ onLogin }) {
     <AuthShell
       kicker="Join the shop"
       title="Create your AF Trends account"
-      lede="A customer account lets you checkout on delivery and follow every drop."
+      lede="A customer account lets you pay before delivery and follow every drop."
     >
       <form className="auth-card" onSubmit={submit}>
         <p className="eyebrow">Customer</p>

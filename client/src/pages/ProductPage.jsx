@@ -40,11 +40,7 @@ export default function ProductPage({ session }) {
   }, [colorId, product])
 
   async function addToCart() {
-    if (!session) {
-      navigate('/login', { state: { from: `/shirts/${slug}` } })
-      return
-    }
-    if (session.user.role !== 'client') {
+    if (session?.user?.role && session.user.role !== 'client') {
       setError('Staff accounts cannot place customer orders. Sign in as a client.')
       return
     }
@@ -57,7 +53,7 @@ export default function ProductPage({ session }) {
     try {
       await request('/cart/items', {
         method: 'POST',
-        token: session.token,
+        token: session?.user?.role === 'client' ? session.token : undefined,
         body: { variant_id: variant.id, quantity: 1 },
       })
       navigate('/cart')
@@ -133,11 +129,11 @@ export default function ProductPage({ session }) {
           </div>
         </div>
         {error ? <p className="error">{error}</p> : null}
-        <button type="button" className="btn" onClick={addToCart} disabled={busy || !variant}>
-          {session ? 'Add to cart' : 'Sign in to buy'}
+        <button type="button" className="btn" onClick={addToCart} disabled={busy || !variant || Number(variant.stock) <= 0}>
+          {Number(variant?.stock) <= 0 ? 'Out of stock' : 'Add to cart'}
         </button>
         <p className="muted" style={{ marginTop: 12 }}>
-          Payment is collected when the shirt is delivered.
+          Payment is collected before we deliver nationwide.
         </p>
       </div>
     </main>

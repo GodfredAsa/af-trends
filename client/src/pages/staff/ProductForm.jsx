@@ -50,6 +50,7 @@ export default function ProductForm({ session }) {
           colorIds: data.colors.map((color) => color.id),
           sizes: data.sizes,
           qty,
+          is_new_arrival: !!data.is_new_arrival,
         })
         setPublished(data.is_published)
         setUploadColor((current) => current || data.colors[0]?.id || '')
@@ -76,6 +77,7 @@ export default function ProductForm({ session }) {
         color_ids: form.colorIds,
         sizes: form.sizes,
         is_published: isNew ? false : published,
+        is_new_arrival: !!form.is_new_arrival,
       }
       if (isNew) body.variants = buildVariants(form)
       const saved = isNew

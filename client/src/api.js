@@ -1,4 +1,5 @@
 const SESSION_KEY = 'af-trends-session'
+const CART_KEY = 'af-trends-cart-key'
 
 function errorMessage(data, fallback) {
   const detail = data?.detail
@@ -7,10 +8,24 @@ function errorMessage(data, fallback) {
   return fallback
 }
 
+export function cartKey() {
+  try {
+    let key = localStorage.getItem(CART_KEY)
+    if (!key) {
+      key = crypto.randomUUID()
+      localStorage.setItem(CART_KEY, key)
+    }
+    return key
+  } catch {
+    return crypto.randomUUID()
+  }
+}
+
 export async function request(path, { method = 'GET', token, body, form } = {}) {
   const headers = {}
   if (body !== undefined) headers['Content-Type'] = 'application/json'
   if (token) headers.Authorization = `Bearer ${token}`
+  headers['X-Cart-Key'] = cartKey()
 
   let response
   try {
@@ -60,4 +75,23 @@ export function money(value, currency = 'GHS') {
 
 export function statusLabel(value) {
   return String(value || '').replaceAll('_', ' ')
+}
+
+export function formatPlacedAt(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const now = new Date()
+  const time = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+  if (date.toDateString() === now.toDateString()) return `Today, ${time}`
+  const yesterday = new Date(now)
+  yesterday.setDate(now.getDate() - 1)
+  if (date.toDateString() === yesterday.toDateString()) return `Yesterday, ${time}`
+  return date.toLocaleString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: date.getFullYear() === now.getFullYear() ? undefined : 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
 }

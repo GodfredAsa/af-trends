@@ -4,7 +4,8 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from app.models import ColorPalette, Order, Product, ProductImage, StoreSettings, User, Variant
+from app.cart_hold import CART_HOLD_HOURS
+from app.models import ColorPalette, Order, Product, ProductImage, StoreSettings, User, UserRole, Variant
 from app.money import as_money, money_str
 from app.privileges import privileges_for
 from app.schemas import (
@@ -114,6 +115,7 @@ def product_list_item(product: Product, db: Session) -> ProductListItem:
         cost_price=money_str(getattr(product, "cost_price", 0) or 0),
         currency=currency(db),
         is_published=product.is_published,
+        is_new_arrival=bool(getattr(product, "is_new_arrival", False)),
         primary_image=image_out(image) if image else None,
         colors=[color_out(color) for color in product_colors(product)],
         sizes=product_sizes(product),
@@ -132,6 +134,7 @@ def product_out(product: Product, db: Session) -> ProductOut:
         cost_price=money_str(getattr(product, "cost_price", 0) or 0),
         currency=currency(db),
         is_published=product.is_published,
+        is_new_arrival=bool(getattr(product, "is_new_arrival", False)),
         colors=[color_out(color) for color in product_colors(product)],
         sizes=product_sizes(product),
         images=[image_out(image) for image in sorted(product.images, key=lambda i: i.sort_order)],
@@ -197,13 +200,19 @@ def cart_item_out(item, db: Session) -> CartItemOut:
         size=variant.size,
         image_url=image_for_variant(product, variant.color_id),
         slug=product.slug,
+        expires_at=getattr(item, "expires_at", None),
     )
 
 
 def cart_out(items, db: Session) -> CartOut:
     mapped = [cart_item_out(item, db) for item in items]
     subtotal = sum((as_money(row.unit_price) * row.quantity for row in items), start=as_money(0))
-    return CartOut(items=mapped, subtotal=money_str(subtotal), currency=currency(db))
+    return CartOut(
+        items=mapped,
+        subtotal=money_str(subtotal),
+        currency=currency(db),
+        hold_hours=CART_HOLD_HOURS,
+    )
 
 
 PURGE_STATUSES = {"delivered", "cancelled"}
@@ -236,7 +245,7 @@ def can_purge_order(order: Order) -> bool:
     return bool(after and datetime.now(timezone.utc) >= after)
 
 
-def order_out(order: Order, include_staff: bool = False) -> OrderOut:
+def order_out(order: Order, include_staff: bool = False, actor: User | None = None) -> OrderOut:
     notes: list[OrderNoteOut] = []
     events: list[OrderEventOut] = []
     if include_staff:
@@ -311,9 +320,17 @@ def order_out(order: Order, include_staff: bool = False) -> OrderOut:
         customer_note=order.customer_note,
         created_at=order.created_at,
         updated_at=order.updated_at,
-        can_delete=can_purge_order(order) if include_staff else False,
-        deletable_after=order_purge_at(order) if include_staff else None,
+        can_delete=_can_delete_order(order, actor) if include_staff else False,
+        deletable_after=None if (actor and actor.role == UserRole.superadmin.value) else (
+            order_purge_at(order) if include_staff else None
+        ),
     )
+
+
+def _can_delete_order(order: Order, actor: User | None) -> bool:
+    if actor is not None and actor.role == UserRole.superadmin.value:
+        return True
+    return can_purge_order(order)
 
 
 def page(items: list, page_num: int, page_size: int, total: int) -> dict:

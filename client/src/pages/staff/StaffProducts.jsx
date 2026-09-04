@@ -217,6 +217,7 @@ export default function StaffProducts({ session }) {
                 <span className={`shirt-status ${product.is_published ? 'live' : 'draft'}`}>
                   {product.is_published ? 'Published' : 'Draft'}
                 </span>
+                {product.is_new_arrival ? <span className="shirt-status live">New</span> : null}
                 <span className={`stock-label ${stock.key}`}>{stock.text}</span>
               </Link>
               <div className="shirt-body">

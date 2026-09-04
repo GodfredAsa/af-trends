@@ -72,6 +72,7 @@ def create_stock(payload: StockCreate, _user: CatalogEditor, db: DbSession) -> S
             base_price=payload.selling_price,
             cost_price=payload.cost_price,
             is_published=False,
+            is_new_arrival=payload.is_new_arrival,
         )
         db.add(product)
         db.flush()

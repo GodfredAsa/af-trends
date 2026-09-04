@@ -77,14 +77,7 @@ export default function App() {
         <Route path="/shirts/:slug" element={<ProductPage session={session} />} />
         <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
         <Route path="/register" element={<RegisterPage onLogin={handleLogin} />} />
-        <Route
-          path="/cart"
-          element={
-            <ClientOnly session={session}>
-              <CartPage session={session} />
-            </ClientOnly>
-          }
-        />
+        <Route path="/cart" element={<CartPage session={session} />} />
         <Route
           path="/checkout"
           element={

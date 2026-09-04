@@ -13,6 +13,7 @@ export function emptyShirtForm(palette = []) {
     colorIds: palette.slice(0, 2).map((color) => color.id),
     sizes: ['S', 'M', 'L', 'XL'],
     qty: {},
+    is_new_arrival: false,
   }
 }
 
@@ -223,6 +224,16 @@ export default function ShirtEditorFields({
           })}
         </div>
       </section>
+
+      <label className="publish-toggle">
+        <input
+          type="checkbox"
+          checked={!!form.is_new_arrival}
+          onChange={(event) => patch({ is_new_arrival: event.target.checked })}
+          disabled={disabled}
+        />
+        Show in New arrivals
+      </label>
 
       {showQty && form.colorIds.length && form.sizes.length ? (
         <section className="form-block">

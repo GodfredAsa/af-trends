@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { money, request, statusLabel } from '../../api.js'
 import { PRIV, can } from '../../privileges.js'
+import { IconTrash } from '../../components/Icons.jsx'
 
 const NEXT = {
   support: {
@@ -30,6 +31,7 @@ export default function StaffOrderDetail({ session }) {
   const role = session.user.role
   const canPay = can(session.user, PRIV.ORDERS_COLLECT)
   const canDeleteOrder = can(session.user, PRIV.ORDERS_DELETE)
+  const isSuperadmin = session.user.role === 'superadmin'
 
   function load() {
     request(`/staff/orders/${id}`, { token: session.token })
@@ -81,7 +83,16 @@ export default function StaffOrderDetail({ session }) {
   }
 
   async function removeOrder() {
-    if (!window.confirm('Delete this order permanently?')) return
+    const held = !['delivered', 'cancelled'].includes(order.status)
+    if (
+      !window.confirm(
+        held
+          ? 'Delete this order permanently? Held stock will be returned.'
+          : 'Delete this order permanently?',
+      )
+    ) {
+      return
+    }
     setBusy(true)
     setError('')
     try {
@@ -97,7 +108,11 @@ export default function StaffOrderDetail({ session }) {
   if (!order) return <p className="muted">{error || 'Loading…'}</p>
   const actions = NEXT[role]?.[order.status] || []
   const waitingDelete =
-    canDeleteOrder && (order.status === 'delivered' || order.status === 'cancelled') && !order.can_delete
+    canDeleteOrder &&
+    !isSuperadmin &&
+    (order.status === 'delivered' || order.status === 'cancelled') &&
+    !order.can_delete
+  const showDelete = canDeleteOrder && (isSuperadmin || order.can_delete)
 
   return (
     <div>
@@ -142,9 +157,10 @@ export default function StaffOrderDetail({ session }) {
             Cash collected
           </button>
         ) : null}
-        {canDeleteOrder && order.can_delete ? (
-          <button type="button" className="btn ghost" onClick={removeOrder} disabled={busy}>
-            {busy ? 'Deleting…' : 'Delete order'}
+        {showDelete ? (
+          <button type="button" className="trash-btn labeled" onClick={removeOrder} disabled={busy}>
+            <IconTrash />
+            {busy ? 'Deleting…' : 'Delete'}
           </button>
         ) : null}
       </div>

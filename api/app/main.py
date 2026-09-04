@@ -62,5 +62,5 @@ app.include_router(staff_privileges.router, prefix="/api/v1/staff", tags=["staff
 
 @app.get("/api/v1/health")
 def health() -> dict[str, str]:
-    return {"status": "ok", "service": "af-trends"}
+    return {"status": "ok", "service": "af-trends", "cart_hold": "4h", "orders": "paged"}
 

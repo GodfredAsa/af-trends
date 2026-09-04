@@ -5,20 +5,22 @@ import { money, request } from '../api.js'
 export default function CartPage({ session }) {
   const [cart, setCart] = useState(null)
   const [error, setError] = useState('')
+  const token = session?.user?.role === 'client' ? session.token : undefined
+  const canCheckout = session?.user?.role === 'client'
 
   function load() {
-    request('/cart', { token: session.token })
+    request('/cart', { token })
       .then(setCart)
       .catch((err) => setError(err.message))
   }
 
-  useEffect(load, [session.token])
+  useEffect(load, [token])
 
   async function update(id, quantity) {
     try {
       const next = await request(`/cart/items/${id}`, {
         method: 'PATCH',
-        token: session.token,
+        token,
         body: { quantity },
       })
       setCart(next)
@@ -29,7 +31,7 @@ export default function CartPage({ session }) {
 
   async function remove(id) {
     try {
-      const next = await request(`/cart/items/${id}`, { method: 'DELETE', token: session.token })
+      const next = await request(`/cart/items/${id}`, { method: 'DELETE', token })
       setCart(next)
     } catch (err) {
       setError(err.message)
@@ -37,6 +39,8 @@ export default function CartPage({ session }) {
   }
 
   if (!cart) return <p className="wrap muted">Loading cart…</p>
+
+  const hours = cart.hold_hours || 4
 
   return (
     <main className="panel wide">
@@ -48,6 +52,10 @@ export default function CartPage({ session }) {
         </p>
       ) : (
         <>
+          <p className="muted">
+            These items are held for {hours} hours. If you don&apos;t place an order, they go back to stock
+            automatically.
+          </p>
           {cart.items.map((item) => (
             <div className="cart-line" key={item.id}>
               <img src={item.image_url} alt="" />
@@ -75,9 +83,15 @@ export default function CartPage({ session }) {
           <p>
             Subtotal <strong>{money(cart.subtotal, cart.currency)}</strong>
           </p>
-          <Link className="btn" to="/checkout">
-            Checkout · pay on delivery
-          </Link>
+          {canCheckout ? (
+            <Link className="btn" to="/checkout">
+              Checkout · pay before delivery
+            </Link>
+          ) : (
+            <Link className="btn" to="/login" state={{ from: '/checkout' }}>
+              Sign in to checkout
+            </Link>
+          )}
         </>
       )}
     </main>

@@ -48,6 +48,7 @@ function pad(n) {
 
 export default function LandingPage() {
   const [products, setProducts] = useState([])
+  const [arrivals, setArrivals] = useState([])
   const [error, setError] = useState('')
   const scroller = useRef(null)
   const countdown = useCountdown()
@@ -57,11 +58,13 @@ export default function LandingPage() {
     request('/catalog/products?page_size=48&sort=newest')
       .then((data) => setProducts(data.items || []))
       .catch((err) => setError(err.message))
+    request('/catalog/products?page_size=24&sort=newest&is_new_arrival=true')
+      .then((data) => setArrivals(data.items || []))
+      .catch(() => {})
   }, [])
 
   const floaters = products.slice(0, 3)
   const featured = products.slice(0, 6)
-  const arrivals = products
   const bestsellers = products.slice(0, 3)
 
   function scrollRow(dir) {
@@ -76,7 +79,7 @@ export default function LandingPage() {
           <h1>Discover tees you’ll love.</h1>
           <p className="lede">
             Custom African-inspired prints on heavy cotton. Pick a color, pick a
-            size, pay when it arrives.
+            size, and pay before we deliver nationwide.
           </p>
           <div className="hero-actions">
             <a className="btn" href="#shop">
@@ -115,14 +118,14 @@ export default function LandingPage() {
           <IconTruck />
           <div>
             <strong>Nationwide delivery</strong>
-            <span>Accra Metro and other regions</span>
+            <span>We deliver across Ghana</span>
           </div>
         </div>
         <div>
           <IconLock />
           <div>
-            <strong>Pay on delivery</strong>
-            <span>Cash when the shirt arrives</span>
+            <strong>Payment before delivery</strong>
+            <span>Pay first, then we ship</span>
           </div>
         </div>
         <div>
@@ -179,7 +182,10 @@ export default function LandingPage() {
           </div>
         </div>
         <div className="arrival-row" ref={scroller}>
-          {arrivals.map((product, index) => (
+          {arrivals.length === 0 ? (
+            <p className="muted">No new arrivals right now. Check the shop for the full collection.</p>
+          ) : (
+            arrivals.map((product, index) => (
             <article className="product-card" key={product.id}>
               <Link to={`/shirts/${product.slug}`} className="photo">
                 <span className={`tag ${index === 1 ? 'sale' : ''}`}>{index === 1 ? '-20%' : 'New'}</span>
@@ -206,7 +212,8 @@ export default function LandingPage() {
                 </Link>
               </div>
             </article>
-          ))}
+            ))
+          )}
         </div>
       </section>
 
@@ -229,7 +236,7 @@ export default function LandingPage() {
                 <p className="price">{money(product.base_price, product.currency)}</p>
                 <Stars />
                 <p className="muted">
-                  Heavy cotton, custom print. Choose a color at checkout and pay on delivery.
+                  Heavy cotton, custom print. Choose a color at checkout and pay before delivery.
                 </p>
                 <div className="best-actions">
                   <Link className="btn dark" to={`/shirts/${product.slug}`}>
@@ -249,7 +256,7 @@ export default function LandingPage() {
         <div className="promo-card sale">
           <div>
             <p className="chip light">Flash sale</p>
-            <h3>Pay on delivery. Up to ready-to-wear drops.</h3>
+            <h3>Payment before delivery. Up to ready-to-wear drops.</h3>
             <div className="timer">
               <div>
                 <b>{pad(countdown.days)}</b>

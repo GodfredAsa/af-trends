@@ -145,6 +145,7 @@ class Product(Base):
     base_price: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     cost_price: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("0.00"))
     is_published: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    is_new_arrival: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
@@ -225,16 +226,20 @@ class Variant(Base):
 
 class CartItem(Base):
     __tablename__ = "cart_items"
-    __table_args__ = (UniqueConstraint("user_id", "variant_id"),)
+    __table_args__ = (UniqueConstraint("owner_key", "variant_id"),)
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=new_uuid)
-    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
+    owner_key: Mapped[str] = mapped_column(String(80), index=True)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)
+    guest_key: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     variant_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("variants.id"), index=True)
     quantity: Mapped[int] = mapped_column(Integer)
     unit_price: Mapped[Decimal] = mapped_column(Numeric(10, 2))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    holds_stock: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
-    user: Mapped[User] = relationship(back_populates="cart_items")
+    user: Mapped[User | None] = relationship(back_populates="cart_items")
     variant: Mapped[Variant] = relationship()
 
 
@@ -260,6 +265,7 @@ class Order(Base):
     address_city: Mapped[str] = mapped_column(String(128))
     address_region: Mapped[str] = mapped_column(String(128))
     address_notes: Mapped[str] = mapped_column(String(255), default="")
+    stock_held: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 

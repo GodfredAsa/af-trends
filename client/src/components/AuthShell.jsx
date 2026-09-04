@@ -3,7 +3,7 @@ import { IconLock, IconShirt, IconTruck } from './Icons.jsx'
 import Logo from './Logo.jsx'
 
 const POINTS = [
-  { icon: <IconTruck />, title: 'Pay on delivery', text: 'Cash when the shirt arrives, nationwide.' },
+  { icon: <IconTruck />, title: 'Payment before delivery', text: 'Pay first. We deliver nationwide.' },
   { icon: <IconShirt />, title: 'Custom tees', text: 'Pick colour, size, and a print that fits you.' },
   { icon: <IconLock />, title: 'Staff console', text: 'Orders, stock, and the catalog in one place.' },
 ]

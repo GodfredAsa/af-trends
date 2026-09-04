@@ -60,6 +60,7 @@ PRODUCTS = [
         "colors": ["Black", "White", "Navy"],
         "sizes": ["S", "M", "L", "XL"],
         "stock": 12,
+        "new_arrival": True,
         "marks": [("KENTE", "CREST"), ("BACK", "PRINT")],
     },
     {
@@ -70,6 +71,7 @@ PRODUCTS = [
         "colors": ["Olive", "Black", "White"],
         "sizes": ["S", "M", "L", "XL", "XXL"],
         "stock": 10,
+        "new_arrival": True,
         "marks": [("SANKOFA", "MARK"), ("ADINKRA", "LINE")],
     },
     {
@@ -80,6 +82,7 @@ PRODUCTS = [
         "colors": ["Black", "Dark Gray", "Navy"],
         "sizes": ["XS", "S", "M", "L", "XL"],
         "stock": 14,
+        "new_arrival": True,
         "marks": [("ACCRA", "NIGHTS"), ("25° W", "CITY")],
     },
     {
@@ -206,6 +209,7 @@ def seed_if_empty(db: Session) -> None:
             base_price=spec["price"],
             cost_price=spec["price"] * Decimal("0.55"),
             is_published=True,
+            is_new_arrival=bool(spec.get("new_arrival")),
         )
         db.add(product)
         db.flush()

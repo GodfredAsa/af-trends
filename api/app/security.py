@@ -81,3 +81,12 @@ def get_current_user(
             detail="This role is not allowed to sign in.",
         )
     return user
+
+
+def get_optional_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    db: Session = Depends(get_db),
+) -> User | None:
+    if credentials is None or credentials.scheme.lower() != "bearer":
+        return None
+    return get_current_user(credentials, db)

@@ -58,6 +58,7 @@ export default function AddShirtModal({ session, palette: paletteProp, mode = 's
                 sizes: form.sizes,
                 variants,
                 is_published: false,
+                is_new_arrival: !!form.is_new_arrival,
               },
             })
           : await request('/staff/stock', {
@@ -71,6 +72,7 @@ export default function AddShirtModal({ session, palette: paletteProp, mode = 's
                 color_ids: form.colorIds,
                 sizes: form.sizes,
                 variants,
+                is_new_arrival: !!form.is_new_arrival,
               },
             })
       onCreated?.(saved)

@@ -36,7 +36,7 @@ export default function OrderDetailPage({ session }) {
       {error ? <p className="error">{error}</p> : null}
       <p>
         <span className="badge">{statusLabel(order.status)}</span>{' '}
-        <span className="badge">{statusLabel(order.payment_status)} · cash on delivery</span>
+        <span className="badge">{statusLabel(order.payment_status)} · payment before delivery</span>
       </p>
       {order.items.map((item) => (
         <div className="order-line" key={item.id}>

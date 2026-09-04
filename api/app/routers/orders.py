@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
+from app.cart_hold import release_expired_carts, resolve_owner, restore_order_items, take_stock
 from app.deps import ClientUser, DbSession, Pagination
 from app.models import (
     Address,
@@ -21,7 +22,7 @@ from app.models import (
     Variant,
 )
 from app.money import as_money
-from app.order_machine import assert_transition
+from app.order_machine import assert_transition, should_restore
 from app.schemas import CheckoutIn, OrderOut
 from app.serializers import image_for_variant, order_out
 
@@ -46,9 +47,13 @@ def _next_order_number(db) -> str:
 
 @router.post("/orders", response_model=OrderOut, status_code=status.HTTP_201_CREATED)
 def checkout(payload: CheckoutIn, user: ClientUser, db: DbSession) -> OrderOut:
+    release_expired_carts(db)
+    owner = resolve_owner(user, None)
+    if owner is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sign in as a customer to check out.")
     items = db.scalars(
         select(CartItem)
-        .where(CartItem.user_id == user.id)
+        .where(CartItem.owner_key == owner.owner_key)
         .options(
             selectinload(CartItem.variant).selectinload(Variant.color),
             selectinload(CartItem.variant).selectinload(Variant.product).selectinload(Product.images),
@@ -65,11 +70,14 @@ def checkout(payload: CheckoutIn, user: ClientUser, db: DbSession) -> OrderOut:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Delivery zone not found.")
 
     for item in items:
-        if item.quantity > item.variant.stock or not item.variant.product.is_published:
+        if not item.variant.product.is_published or item.variant.product.deleted_at:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"{item.variant.product.name} in {item.variant.color.name} / {item.variant.size} is no longer available.",
             )
+        if not item.holds_stock:
+            take_stock(db, item.variant, item.quantity)
+            item.holds_stock = True
 
     subtotal = sum((as_money(item.unit_price) * item.quantity for item in items), start=as_money(0))
     fee = as_money(zone.fee)
@@ -92,6 +100,7 @@ def checkout(payload: CheckoutIn, user: ClientUser, db: DbSession) -> OrderOut:
         address_city=address.city,
         address_region=address.region,
         address_notes=address.notes,
+        stock_held=True,
     )
     db.add(order)
     db.flush()
@@ -112,6 +121,7 @@ def checkout(payload: CheckoutIn, user: ClientUser, db: DbSession) -> OrderOut:
                 image_url=image_for_variant(variant.product, variant.color_id),
             )
         )
+        item.holds_stock = False
         db.delete(item)
     db.add(
         OrderEvent(
@@ -164,6 +174,9 @@ def cancel_order(order_id: UUID, user: ClientUser, db: DbSession) -> OrderOut:
     if order is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found.")
     assert_transition(user.role, order.status, OrderStatus.cancelled.value)
+    if should_restore(order.status, OrderStatus.cancelled.value, bool(getattr(order, "stock_held", False))):
+        restore_order_items(db, order)
+        order.stock_held = False
     db.add(
         OrderEvent(
             order_id=order.id,

@@ -37,7 +37,7 @@ export default function LoginPage({ onLogin }) {
     <AuthShell
       kicker="Welcome back"
       title="Sign in to AF Trends"
-      lede="Shop custom tees, track cash-on-delivery orders, or open the staff dashboard."
+      lede="Shop custom tees, pay before delivery, or open the staff dashboard."
     >
       <form className="auth-card" onSubmit={submit}>
         <p className="eyebrow">Account</p>
