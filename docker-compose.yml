@@ -1,0 +1,17 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      JWT_SECRET: ${JWT_SECRET:-af-trends-local-dev-secret-key}
+      SEED_PASSWORD: ${SEED_PASSWORD:-trends123}
+      CORS_ORIGINS: http://localhost:8000,http://127.0.0.1:8000
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
+    volumes:
+      - af-trends-data:/app/data
+
+volumes:
+  af-trends-data:

@@ -91,35 +91,7 @@ af-trends/
 | Images | Multipart upload; store files, save URLs | Many images per shirt |
 | API docs | FastAPI `/docs` (Swagger) | Review and QA against this README |
 
-**Local run**
-
-```bash
-# Terminal 1 — API
-cd api
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env   # first time only
-uvicorn app.main:app --reload --port 8000
-
-# Terminal 2 — client
-cd client
-npm install
-npm run dev
-```
-
-Storefront: [http://127.0.0.1:5174](http://127.0.0.1:5174)  
-API: [http://127.0.0.1:8000](http://127.0.0.1:8000)  
-Swagger: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
-
-Seed password for all demo accounts: `trends123`
-
-| Email | Role |
-| --- | --- |
-| `superadmin@aftrends.com` | superadmin |
-| `manager@aftrends.com` | manager |
-| `support@aftrends.com` | support |
-| `client@aftrends.com` | client |
+**Local run** — full steps (without Docker, and with Docker) are in **[Local setup](#local-setup)** at the bottom of this file.
 
 ---
 
@@ -951,3 +923,111 @@ Comment on this README (inline or in chat) with:
 - Changes to any row in §1 / answers to §14
 
 Implementation starts only after that. The first build slice will be Phase 0 + 1 (auth, products, colors, multi-image upload) so the landing page has real shirts to list.
+
+---
+
+# Local setup
+
+How to run AF Trends on your machine.
+
+- **[Without Docker](#without-docker)** — Python + Node, two terminals (use this for day-to-day coding)
+- **[With Docker](#with-docker)** — one container on port 8000
+
+PostgreSQL is not required. SQLite is the default.
+
+---
+
+## Without Docker
+
+You need **Python 3.12+** and **Node.js 22+** (npm). Docker is not used.
+
+The API listens on port **8000**. Vite listens on port **5174** and proxies `/api` and `/media` to the API. Keep **both terminals running**.
+
+### 1. Clone (if you have not already)
+
+```bash
+git clone <this-repo-url>
+cd af-trends
+```
+
+### 2. Start the API
+
+```bash
+cd api
+python3 -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+cp .env.example .env               # first time only
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+Leave this terminal running. On first start the API creates `api/af_trends.db`, seeds demo users and catalog, and serves Swagger at [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs).
+
+### 3. Start the client
+
+In a **second** terminal (do not stop the API):
+
+```bash
+cd client
+npm install
+npm run dev
+```
+
+Open the storefront at [http://127.0.0.1:5174](http://127.0.0.1:5174).
+
+| URL | What |
+| --- | --- |
+| [http://127.0.0.1:5174](http://127.0.0.1:5174) | Storefront + staff console |
+| [http://127.0.0.1:5174/staff](http://127.0.0.1:5174/staff) | Staff console |
+| [http://127.0.0.1:8000](http://127.0.0.1:8000) | API |
+| [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) | Swagger |
+
+### 4. API environment
+
+`api/.env` is loaded by FastAPI. Copy from `api/.env.example` and keep secrets out of git. Leave `CLIENT_DIST` empty so Vite serves the UI.
+
+| Variable | Local default | Notes |
+| --- | --- | --- |
+| `DATABASE_URL` | `sqlite:///./af_trends.db` | File is created under `api/` |
+| `JWT_SECRET` | dev placeholder | Change before any real deploy |
+| `CORS_ORIGINS` | Vite on 5173/5174 | Comma-separated origins; do not use `*` with credentials |
+| `MEDIA_DIR` | `media` | Local product / catalog photos |
+| `SEED_PASSWORD` | `trends123` | Password for all seeded demo accounts |
+| `CLIENT_DIST` | empty | Must stay empty without Docker |
+| `CLOUDINARY_*` | optional | Leave blank to store images on disk |
+
+---
+
+## With Docker
+
+Builds the React client and runs it from FastAPI in one container. You need **Docker Desktop**. SQLite and uploads persist in a Docker volume.
+
+From the **repo root**:
+
+```bash
+docker compose up --build
+```
+
+Then open [http://127.0.0.1:8000](http://127.0.0.1:8000) (storefront). API is at `/api/v1`, Swagger at `/docs`. Staff console: [http://127.0.0.1:8000/staff](http://127.0.0.1:8000/staff).
+
+Equivalent without Compose:
+
+```bash
+docker build -t af-trends .
+docker run --rm -p 8000:8000 -v af-trends-data:/app/data af-trends
+```
+
+Optional Cloudinary keys can be passed through the environment (see `docker-compose.yml`). Stop with `Ctrl+C`, then `docker compose down` if you started Compose.
+
+---
+
+## Demo accounts
+
+Seeded on first API start. Password for every account: **`trends123`**
+
+| Email | Role |
+| --- | --- |
+| `superadmin@aftrends.com` | superadmin |
+| `manager@aftrends.com` | manager |
+| `support@aftrends.com` | support |
+| `client@aftrends.com` | client |

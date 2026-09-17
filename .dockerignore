@@ -1,0 +1,16 @@
+.git
+.gitignore
+**/.venv
+**/__pycache__
+**/*.py[cod]
+**/.DS_Store
+**/.env
+**/*.db
+**/*.sqlite3
+**/node_modules
+client/dist
+api/media/products
+README.md
+agent-transcripts
+.cursor
+**/.pytest_cache

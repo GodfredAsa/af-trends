@@ -1,5 +1,8 @@
-from fastapi import FastAPI
+from pathlib import Path
+
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
@@ -63,4 +66,31 @@ app.include_router(staff_privileges.router, prefix="/api/v1/staff", tags=["staff
 @app.get("/api/v1/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "service": "af-trends", "cart_hold": "4h", "orders": "paged"}
+
+
+def _client_dist() -> Path | None:
+    raw = (settings.client_dist or "").strip()
+    if not raw:
+        return None
+    path = Path(raw)
+    if not path.is_absolute():
+        path = settings.media_path.parent / path
+    index = path / "index.html"
+    return path if index.is_file() else None
+
+
+_spa_dir = _client_dist()
+if _spa_dir is not None:
+
+    @app.get("/{full_path:path}")
+    def serve_client(full_path: str):
+        if full_path.startswith(("api/", "media/")):
+            raise HTTPException(status_code=404, detail="Not found.")
+        target = (_spa_dir / full_path).resolve()
+        root = _spa_dir.resolve()
+        if target != root and root not in target.parents:
+            raise HTTPException(status_code=404, detail="Not found.")
+        if full_path and target.is_file():
+            return FileResponse(target)
+        return FileResponse(_spa_dir / "index.html")
 
