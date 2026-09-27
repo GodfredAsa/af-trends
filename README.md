@@ -931,7 +931,8 @@ Implementation starts only after that. The first build slice will be Phase 0 + 1
 How to run AF Trends on your machine.
 
 - **[Without Docker](#without-docker)** — Python + Node, two terminals (use this for day-to-day coding)
-- **[With Docker](#with-docker)** — one container on port 8000
+- **[With Docker](#with-docker)** — one container on port 8000 (includes **M3 / Apple Silicon** build)
+- **[Push to Docker Hub](#push-to-docker-hub)** — build, tag, and publish the image
 
 PostgreSQL is not required. SQLite is the default.
 
@@ -1000,24 +1001,197 @@ Open the storefront at [http://127.0.0.1:5174](http://127.0.0.1:5174).
 
 ## With Docker
 
-Builds the React client and runs it from FastAPI in one container. You need **Docker Desktop**. SQLite and uploads persist in a Docker volume.
+Builds the React client and runs it from FastAPI in one container. SQLite and uploads persist in a Docker volume. Storefront: [http://127.0.0.1:8000](http://127.0.0.1:8000). API: `/api/v1`. Swagger: `/docs`. Staff: `/staff`.
 
-From the **repo root**:
+### New Apple Silicon Mac (M3)
+
+Native `linux/arm64` — do **not** pass `--platform linux/amd64` for local use (that runs under emulation and is much slower).
+
+1. Install **[Docker Desktop for Mac (Apple Silicon)](https://docs.docker.com/desktop/setup/install/mac-install/)**. Open **Docker.app** and wait until the menu bar whale is idle (engine running). **Quit and reopen Terminal** so `docker` is on your PATH.
+
+   If you see `zsh: command not found: docker`, Docker is not installed or this terminal was opened before Docker Desktop. Use the **space** form `docker compose`, not `docker-compose`.
+
+   ```bash
+   which docker
+   docker version
+   docker compose version
+   ```
+
+   If `git` is missing (`zsh: command not found: git`):
+
+   ```bash
+   xcode-select --install
+   ```
+
+2. Confirm the machine is ARM:
 
 ```bash
-docker compose up --build
+uname -m
+# expect: arm64
 ```
 
-Then open [http://127.0.0.1:8000](http://127.0.0.1:8000) (storefront). API is at `/api/v1`, Swagger at `/docs`. Staff console: [http://127.0.0.1:8000/staff](http://127.0.0.1:8000/staff).
+3. Clone and build from the **repo root** (first build pulls Node + Python images and can take several minutes):
 
-Equivalent without Compose:
+```bash
+git clone git@github.com:GodfredAsa/af-trends.git
+cd af-trends
+
+docker compose build
+```
+
+HTTPS clone if you do not have SSH keys: `git clone https://github.com/GodfredAsa/af-trends.git`
+
+Build without Compose:
 
 ```bash
 docker build -t af-trends .
+```
+
+Confirm the image is ARM, not Intel:
+
+```bash
+docker image inspect af-trends --format '{{.Os}}/{{.Architecture}}'
+# expect: linux/arm64
+```
+
+(`docker compose build` tags it as `af-trends-app`; inspect that name instead, or use `docker images`.)
+
+4. Run:
+
+```bash
+docker compose up
+```
+
+Or without Compose:
+
+```bash
 docker run --rm -p 8000:8000 -v af-trends-data:/app/data af-trends
 ```
 
-Optional Cloudinary keys can be passed through the environment (see `docker-compose.yml`). Stop with `Ctrl+C`, then `docker compose down` if you started Compose.
+Then open [http://127.0.0.1:8000](http://127.0.0.1:8000). Stop with `Ctrl+C`. `docker compose down` removes the container but keeps the data volume.
+
+Optional Cloudinary keys: copy `api/.env.example` values into a repo-root `.env` (Compose reads `CLOUDINARY_*`) or pass `-e` on `docker run`. Do not bake `api/.env` into the image (it is dockerignored).
+
+| Problem | Fix |
+| --- | --- |
+| `zsh: command not found: docker` | Install Docker Desktop (Apple Silicon), open the app, then **new terminal**. Check `which docker` |
+| `zsh: command not found: docker-compose` | Use `docker compose` (space), not `docker-compose` |
+| `zsh: command not found: git` | Run `xcode-select --install`, then retry |
+| `Cannot connect to the Docker daemon` | Open Docker Desktop and wait until it is running |
+| Build is extremely slow / `linux/amd64` | Unset `DOCKER_DEFAULT_PLATFORM`. Do not use `--platform linux/amd64` on the M3 |
+| `port is already allocated` | Something else is on 8000; stop it or change the left port, e.g. `"8001:8000"` |
+| Stale image after a git pull | `docker compose build --no-cache` then `docker compose up` |
+
+### Intel Mac / Linux x86, or an image for an Intel server
+
+```bash
+docker build --platform linux/amd64 -t af-trends .
+```
+
+Only use that platform when the **target** is Intel. On an M3 this is emulated and slow.
+
+### Push to Docker Hub
+
+Hub image: **`degreatasa/af-trends-app`**. Run these from the **repo root**.
+
+**1. Log in**
+
+```bash
+docker login
+```
+
+Enter your Docker Hub username and password (or access token).
+
+**2. Recommended from an M3: multi-arch image (amd64 + arm64)**
+
+Most servers are Intel (`linux/amd64`). A native M3 build is `linux/arm64` only and will not run on those hosts. `buildx` builds both and pushes in one step:
+
+```bash
+docker buildx create --name af-trends-builder --use 2>/dev/null || docker buildx use af-trends-builder
+
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  -t degreatasa/af-trends-app:latest \
+  --push .
+```
+
+Optional version tag (in addition to `latest`):
+
+```bash
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  -t degreatasa/af-trends-app:latest \
+  -t degreatasa/af-trends-app:1.0.0 \
+  --push .
+```
+
+**3. Tag a local image and push (single architecture only)**
+
+If `docker compose build` already created `af-trends-app` on this machine:
+
+```bash
+docker tag af-trends-app degreatasa/af-trends-app:latest
+docker push degreatasa/af-trends-app:latest
+```
+
+Or build then push:
+
+```bash
+docker build -t degreatasa/af-trends-app:latest .
+docker push degreatasa/af-trends-app:latest
+```
+
+On an M3 this push is **arm64 only**. Prefer step 2 for Hub.
+
+**4. Pull and run (one image, one port)**
+
+There is **no separate client image**. The React storefront is inside `degreatasa/af-trends-app`. You will not see `client` and `api` as two Docker images. Publish **port 8000** or the browser cannot reach the container.
+
+```bash
+docker pull degreatasa/af-trends-app:latest
+
+docker run --rm --name af-trends \
+  -p 8000:8000 \
+  -e CLIENT_DIST=/app/client-dist \
+  -v af-trends-data:/app/data \
+  degreatasa/af-trends-app:latest
+```
+
+Leave that terminal running. Then open:
+
+| URL | What |
+| --- | --- |
+| [http://127.0.0.1:8000](http://127.0.0.1:8000) | Storefront (client) |
+| [http://127.0.0.1:8000/staff](http://127.0.0.1:8000/staff) | Staff console |
+| [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) | API (Swagger) |
+| [http://127.0.0.1:8000/api/v1/health](http://127.0.0.1:8000/api/v1/health) | API health JSON |
+
+Do **not** use port `5174` after a pull — that port is only for `npm run dev`. Docker does not start Vite.
+
+Confirm the container is up and port 8000 is mapped:
+
+```bash
+docker ps
+```
+
+You should see `0.0.0.0:8000->8000/tcp` (or `127.0.0.1:8000->8000/tcp`). If `docker ps` is empty, the container is not running.
+
+| Problem | Fix |
+| --- | --- |
+| Browser: connection refused | `-p 8000:8000` is missing, or the container exited. Re-run the `docker run` command above |
+| `port is already allocated` | Local uvicorn or another app owns 8000. Stop it, or run `-p 8001:8000` and open [http://127.0.0.1:8001](http://127.0.0.1:8001) |
+| `/` is `{"detail":"Not Found"}` | You hit a **local** API (no storefront), not the container. Stop `uvicorn` on 8000 and use the Docker run command with `-e CLIENT_DIST=/app/client-dist` |
+| Docker Desktop shows only one image | Expected. Client + API are in `degreatasa/af-trends-app` |
+| Docker Desktop Run with no ports | In Optional settings, set host port **8000** |
+
+Compose (same Hub image):
+
+```bash
+docker compose pull
+docker compose up
+```
+
+The image is public unless you create a **private** Hub repository. Do not bake `api/.env` into the image; pass secrets at run time (`-e JWT_SECRET=...`).
 
 ---
 
