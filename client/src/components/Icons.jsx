@@ -211,6 +211,16 @@ export function IconFingerprint(props) {
   )
 }
 
+export function IconUpload(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true" {...props}>
+      <path d="M12 16V5" />
+      <path d="M8 9l4-4 4 4" />
+      <path d="M5 19h14" />
+    </svg>
+  )
+}
+
 export function IconTrash(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true" {...props}>

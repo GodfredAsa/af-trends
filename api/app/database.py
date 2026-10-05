@@ -25,6 +25,9 @@ def ensure_schema() -> None:
         if "cost_price" not in columns:
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE products ADD COLUMN cost_price NUMERIC(10, 2) DEFAULT 0 NOT NULL"))
+        if "discount_percent" not in columns:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE products ADD COLUMN discount_percent NUMERIC(5, 2) DEFAULT 0 NOT NULL"))
         if "is_new_arrival" not in columns:
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE products ADD COLUMN is_new_arrival BOOLEAN DEFAULT 0 NOT NULL"))
@@ -51,6 +54,12 @@ def ensure_schema() -> None:
         if "privilege_matrix" not in setting_columns:
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE store_settings ADD COLUMN privilege_matrix TEXT DEFAULT '' NOT NULL"))
+        if "payment_account" not in setting_columns:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE store_settings ADD COLUMN payment_account VARCHAR(64) DEFAULT '024 903 9110' NOT NULL"))
+        if "payment_network" not in setting_columns:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE store_settings ADD COLUMN payment_network VARCHAR(64) DEFAULT 'MTN MoMo' NOT NULL"))
     if "orders" in tables:
         order_columns = {column["name"] for column in inspector.get_columns("orders")}
         if "stock_held" not in order_columns:

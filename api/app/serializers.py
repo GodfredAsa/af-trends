@@ -5,7 +5,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.cart_hold import CART_HOLD_HOURS
-from app.models import ColorPalette, Order, Product, ProductImage, StoreSettings, User, UserRole, Variant
+from app.models import ColorPalette, Order, PaymentProof, Product, ProductImage, StoreSettings, User, UserRole, Variant
 from app.money import as_money, money_str
 from app.privileges import privileges_for
 from app.schemas import (
@@ -19,6 +19,8 @@ from app.schemas import (
     OrderItemOut,
     OrderNoteOut,
     OrderOut,
+    PaymentProofImageOut,
+    PaymentProofOut,
     ProductListItem,
     ProductOut,
     StockColorQty,
@@ -58,8 +60,27 @@ def currency(db: Session) -> str:
 
 def variant_price(variant: Variant) -> Decimal:
     if variant.price is not None:
-        return as_money(variant.price)
-    return as_money(variant.product.base_price)
+        base = as_money(variant.price)
+    else:
+        base = as_money(variant.product.base_price)
+    return apply_discount(base, getattr(variant.product, "discount_percent", 0))
+
+
+def apply_discount(amount: Decimal, percent) -> Decimal:
+    pct = as_money(percent or 0)
+    if pct <= 0:
+        return as_money(amount)
+    if pct > 100:
+        pct = as_money(100)
+    return as_money(as_money(amount) * (as_money(100) - pct) / as_money(100))
+
+
+def product_sale_price(product: Product) -> str:
+    return money_str(apply_discount(product.base_price, getattr(product, "discount_percent", 0)))
+
+
+def product_discount(product: Product) -> str:
+    return money_str(getattr(product, "discount_percent", 0) or 0)
 
 
 def color_out(color: ColorPalette, in_use: bool = False) -> ColorOut:
@@ -113,10 +134,13 @@ def product_list_item(product: Product, db: Session) -> ProductListItem:
         name=product.name,
         base_price=money_str(product.base_price),
         cost_price=money_str(getattr(product, "cost_price", 0) or 0),
+        discount_percent=product_discount(product),
+        sale_price=product_sale_price(product),
         currency=currency(db),
         is_published=product.is_published,
         is_new_arrival=bool(getattr(product, "is_new_arrival", False)),
         primary_image=image_out(image) if image else None,
+        images=[image_out(img) for img in sorted(product.images, key=lambda i: i.sort_order)],
         colors=[color_out(color) for color in product_colors(product)],
         sizes=product_sizes(product),
         total_units=total_units,
@@ -132,6 +156,8 @@ def product_out(product: Product, db: Session) -> ProductOut:
         description=product.description,
         base_price=money_str(product.base_price),
         cost_price=money_str(getattr(product, "cost_price", 0) or 0),
+        discount_percent=product_discount(product),
+        sale_price=product_sale_price(product),
         currency=currency(db),
         is_published=product.is_published,
         is_new_arrival=bool(getattr(product, "is_new_arrival", False)),
@@ -163,6 +189,8 @@ def stock_item_out(product: Product, db: Session, threshold: int) -> StockItemOu
         name=product.name,
         cost_price=money_str(getattr(product, "cost_price", 0) or 0),
         selling_price=money_str(product.base_price),
+        discount_percent=product_discount(product),
+        sale_price=product_sale_price(product),
         currency=currency(db),
         total_units=total_units,
         label=stock_label(total_units, threshold),
@@ -324,6 +352,22 @@ def order_out(order: Order, include_staff: bool = False, actor: User | None = No
         deletable_after=None if (actor and actor.role == UserRole.superadmin.value) else (
             order_purge_at(order) if include_staff else None
         ),
+        payment_proofs=[_proof_out(proof) for proof in getattr(order, "payment_proofs", []) or []],
+    )
+
+
+def _proof_out(proof: PaymentProof) -> PaymentProofOut:
+    return PaymentProofOut(
+        id=proof.id,
+        transaction_id=proof.transaction_id,
+        payment_number=proof.payment_number,
+        payment_network=proof.payment_network,
+        note=proof.note or "",
+        status=proof.status,
+        created_at=proof.created_at,
+        reviewed_at=proof.reviewed_at,
+        review_note=proof.review_note or "",
+        images=[PaymentProofImageOut(id=image.id, url=image.url) for image in proof.images],
     )
 
 

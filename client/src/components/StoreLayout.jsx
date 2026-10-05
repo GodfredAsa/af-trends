@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { isStaff, request } from '../api.js'
-import { IconBag, IconHeart, IconSearch, IconUser } from './Icons.jsx'
+import { IconBag, IconSearch, IconUser } from './Icons.jsx'
 import Logo from './Logo.jsx'
 
 export default function StoreLayout({ session, onLogout }) {
@@ -40,6 +40,7 @@ export default function StoreLayout({ session, onLogout }) {
         <div className="inner wrap">
           <Link className="brand" to="/">
             <Logo />
+            <span className="brand-motto">Your style, your trendz</span>
           </Link>
           <nav className="nav-links" aria-label="Primary">
             <NavLink to="/" end>
@@ -68,9 +69,6 @@ export default function StoreLayout({ session, onLogout }) {
                 <IconSearch />
               </button>
             )}
-            <Link className="icon-btn" to={user ? '/account/orders' : '/login'} aria-label="Saved">
-              <IconHeart />
-            </Link>
             <Link className="icon-btn" to={user ? (user.role === 'client' ? '/account/orders' : '/staff') : '/login'} aria-label="Account">
               <IconUser />
             </Link>

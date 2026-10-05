@@ -78,6 +78,7 @@ def create_product(payload: ProductCreate, _user: CatalogEditor, db: DbSession) 
             cost_price=payload.cost_price,
             is_published=payload.is_published,
             is_new_arrival=payload.is_new_arrival,
+            discount_percent=payload.discount_percent,
         )
         db.add(product)
         db.flush()
@@ -131,6 +132,8 @@ def patch_product(product_id: UUID, payload: ProductPatch, _user: CatalogEditor,
         product.is_published = payload.is_published
     if payload.is_new_arrival is not None:
         product.is_new_arrival = payload.is_new_arrival
+    if payload.discount_percent is not None:
+        product.discount_percent = payload.discount_percent
     try:
         if payload.color_ids is not None:
             _assert_can_drop_variants(db, product, payload.color_ids, None)

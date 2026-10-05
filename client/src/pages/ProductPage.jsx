@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { money, request } from '../api.js'
+import { hasDiscount, money, request, saleAmount } from '../api.js'
+import ImageCarousel from '../components/ImageCarousel.jsx'
 
 export default function ProductPage({ session }) {
   const { slug } = useParams()
@@ -73,26 +74,38 @@ export default function ProductPage({ session }) {
     <main className="product wrap">
       <div className="gallery">
         <div className="main">
-          {activeImage ? <img src={activeImage.url} alt={activeImage.alt_text || product.name} /> : null}
+          <ImageCarousel
+            images={images}
+            alt={product.name}
+            autoPlay
+            index={Math.max(0, images.findIndex((image) => image.id === activeImage?.id))}
+            onIndexChange={(next) => setImageId(images[next]?.id || '')}
+          />
         </div>
-        <div className="thumbs">
-          {images.map((image) => (
-            <button
-              key={image.id}
-              type="button"
-              className={image.id === activeImage?.id ? 'active' : ''}
-              onClick={() => setImageId(image.id)}
-            >
-              <img src={image.url} alt="" />
-            </button>
-          ))}
-        </div>
+        {images.length > 1 ? (
+          <div className="thumbs">
+            {images.map((image) => (
+              <button
+                key={image.id}
+                type="button"
+                className={image.id === activeImage?.id ? 'active' : ''}
+                onClick={() => setImageId(image.id)}
+              >
+                <img src={image.url} alt="" />
+              </button>
+            ))}
+          </div>
+        ) : null}
       </div>
       <div>
         <p className="eyebrow">T-shirt</p>
         <h1>{product.name}</h1>
         {variant && Number(variant.stock) <= 0 ? <span className="stock-label out_of_stock">Out of stock</span> : null}
-        <p className="price">{money(variant?.price || product.base_price, product.currency)}</p>
+        <p className="price">
+          {money(variant?.price || saleAmount(product), product.currency)}
+          {hasDiscount(product) ? <s>{money(product.base_price, product.currency)}</s> : null}
+          {hasDiscount(product) ? <span className="tag sale relative">-{Number(product.discount_percent)}%</span> : null}
+        </p>
         <p className="lead">{product.description}</p>
         <div className="picker">
           <p>Color · {product.colors.find((c) => c.id === colorId)?.name}</p>

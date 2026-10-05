@@ -80,12 +80,8 @@ export default function OrderModal({ order, onClose, manageHref }) {
             <dt>Subtotal</dt>
             <dd>{money(order.subtotal, order.currency)}</dd>
           </div>
-          <div>
-            <dt>Delivery</dt>
-            <dd>{money(order.delivery_fee, order.currency)}</dd>
-          </div>
           <div className="grand">
-            <dt>Total due on delivery</dt>
+            <dt>Total</dt>
             <dd>{money(order.total, order.currency)}</dd>
           </div>
         </dl>

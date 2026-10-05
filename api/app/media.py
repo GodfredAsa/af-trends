@@ -41,7 +41,7 @@ def _configure_cloudinary() -> None:
     )
 
 
-def save_upload(product_id: uuid.UUID, upload: UploadFile) -> tuple[str, str]:
+def _read_image_bytes(upload: UploadFile) -> tuple[bytes, str]:
     content_type = (upload.content_type or "").lower()
     suffix = ALLOWED_TYPES.get(content_type)
     if suffix is None:
@@ -57,27 +57,39 @@ def save_upload(product_id: uuid.UUID, upload: UploadFile) -> tuple[str, str]:
         )
     if not data:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty file.")
-    _configure_cloudinary()
-    try:
-        result = cloudinary.uploader.upload(
-            data,
-            folder=f"af-trends/products/{product_id}",
-            resource_type="image",
-            overwrite=False,
-        )
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Could not upload the image to Cloudinary.",
-        ) from exc
-    url = result.get("secure_url") or result.get("url")
-    public_id = result.get("public_id") or ""
-    if not url:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Cloudinary did not return an image URL.",
-        )
-    return url, public_id
+    return data, suffix
+
+
+def save_upload(product_id: uuid.UUID, upload: UploadFile, folder: str | None = None) -> tuple[str, str]:
+    data, suffix = _read_image_bytes(upload)
+    relative = folder or f"products/{product_id}"
+    if _cloudinary_ready():
+        _configure_cloudinary()
+        try:
+            result = cloudinary.uploader.upload(
+                data,
+                folder=f"af-trends/{relative}",
+                resource_type="image",
+                overwrite=False,
+            )
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Could not upload the image to Cloudinary.",
+            ) from exc
+        url = result.get("secure_url") or result.get("url")
+        public_id = result.get("public_id") or ""
+        if not url:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Cloudinary did not return an image URL.",
+            )
+        return url, public_id
+    dest = settings.media_path / relative
+    dest.mkdir(parents=True, exist_ok=True)
+    name = f"{uuid.uuid4()}{suffix}"
+    (dest / name).write_bytes(data)
+    return f"/media/{relative}/{name}", ""
 
 
 def destroy_upload(public_id: str | None) -> None:

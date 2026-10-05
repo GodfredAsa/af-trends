@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { money, request } from '../api.js'
+import { hasDiscount, money, request, saleAmount } from '../api.js'
+import ImageCarousel, { productSlides } from '../components/ImageCarousel.jsx'
 import {
   IconArrow,
   IconBag,
   IconChevron,
   IconHeadset,
-  IconHeart,
   IconLock,
   IconReturn,
   IconStar,
@@ -50,6 +50,14 @@ export default function LandingPage() {
   const [products, setProducts] = useState([])
   const [arrivals, setArrivals] = useState([])
   const [error, setError] = useState('')
+  const [photos, setPhotos] = useState({
+    hero_lookbook: '/photos/hero.jpg',
+    proof_1: '/photos/hero.jpg',
+    proof_2: '/photos/collection.jpg',
+    proof_3: '/photos/line.jpg',
+    flash_sale: '/photos/line.jpg',
+    new_collection: '/photos/collection.jpg',
+  })
   const scroller = useRef(null)
   const countdown = useCountdown()
 
@@ -60,6 +68,11 @@ export default function LandingPage() {
       .catch((err) => setError(err.message))
     request('/catalog/products?page_size=24&sort=newest&is_new_arrival=true')
       .then((data) => setArrivals(data.items || []))
+      .catch(() => {})
+    request('/storefront')
+      .then((data) => {
+        if (data.assets) setPhotos((current) => ({ ...current, ...data.assets }))
+      })
       .catch(() => {})
   }, [])
 
@@ -91,16 +104,16 @@ export default function LandingPage() {
           </div>
           <div className="social-proof">
             <div className="avatars">
-              <img src="/photos/hero.jpg" alt="" />
-              <img src="/photos/collection.jpg" alt="" />
-              <img src="/photos/line.jpg" alt="" />
+              <img src={photos.proof_1} alt="" />
+              <img src={photos.proof_2} alt="" />
+              <img src={photos.proof_3} alt="" />
             </div>
             <p>Loved by customers across Accra, Kumasi, and beyond.</p>
           </div>
         </div>
         <div className="hero-visual">
           <div className="hero-blob" />
-          <img className="hero-photo" src="/photos/hero.jpg" alt="AF Trends lookbook" />
+          <img className="hero-photo" src={photos.hero_lookbook} alt="AF Trends lookbook" />
           {floaters.map((product, index) => (
             <Link className={`floater f${index + 1}`} key={product.id} to={`/shirts/${product.slug}`}>
               {product.primary_image ? <img src={product.primary_image.url} alt="" /> : null}
@@ -155,7 +168,7 @@ export default function LandingPage() {
           {featured.map((product) => (
             <Link className="cat-card" key={product.id} to={`/shirts/${product.slug}`}>
               <div className="photo">
-                {product.primary_image ? <img src={product.primary_image.url} alt={product.name} /> : null}
+                <ImageCarousel images={productSlides(product)} alt={product.name} showArrows={false} />
               </div>
               <div className="cat-label">
                 <strong>{product.name.replace(' Tee', '')}</strong>
@@ -168,7 +181,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="section wrap" id="arrivals">
+      <section className="section wrap arrivals-section" id="arrivals">
         <div className="section-head">
           <h2>New arrivals</h2>
           <div className="row-nav">
@@ -185,33 +198,34 @@ export default function LandingPage() {
           {arrivals.length === 0 ? (
             <p className="muted">No new arrivals right now. Check the shop for the full collection.</p>
           ) : (
-            arrivals.map((product, index) => (
-            <article className="product-card" key={product.id}>
-              <Link to={`/shirts/${product.slug}`} className="photo">
-                <span className={`tag ${index === 1 ? 'sale' : ''}`}>{index === 1 ? '-20%' : 'New'}</span>
-                <span className="wish" aria-hidden="true">
-                  <IconHeart />
-                </span>
-                {product.primary_image ? <img src={product.primary_image.url} alt={product.name} /> : null}
-              </Link>
-              <div className="meta">
-                <h3>
-                  <Link to={`/shirts/${product.slug}`}>{product.name}</Link>
-                </h3>
-                <div className="price-row">
-                  <span>
-                    {money(product.base_price, product.currency)}
-                    {index === 1 ? (
-                      <s>{money((Number(product.base_price) * 1.25).toFixed(2), product.currency)}</s>
-                    ) : null}
-                  </span>
-                  <Stars />
-                </div>
-                <Link className="add-round" to={`/shirts/${product.slug}`} aria-label={`Shop ${product.name}`}>
-                  <IconBag />
+            arrivals.map((product) => (
+              <article className="product-card arrival-card" key={product.id}>
+                <Link to={`/shirts/${product.slug}`} className="photo">
+                  {hasDiscount(product) ? (
+                    <span className="tag sale">-{Number(product.discount_percent)}%</span>
+                  ) : (
+                    <span className="tag">New</span>
+                  )}
+                  <ImageCarousel images={productSlides(product)} alt={product.name} showArrows={false} />
                 </Link>
-              </div>
-            </article>
+                <div className="meta">
+                  <div className="meta-copy">
+                    <h3>
+                      <Link to={`/shirts/${product.slug}`}>{product.name}</Link>
+                    </h3>
+                    <div className="price-row">
+                      <span>
+                        {money(saleAmount(product), product.currency)}
+                        {hasDiscount(product) ? <s>{money(product.base_price, product.currency)}</s> : null}
+                      </span>
+                    </div>
+                    <Stars />
+                  </div>
+                  <Link className="add-round static" to={`/shirts/${product.slug}`} aria-label={`Shop ${product.name}`}>
+                    <IconBag />
+                  </Link>
+                </div>
+              </article>
             ))
           )}
         </div>
@@ -226,14 +240,21 @@ export default function LandingPage() {
           {bestsellers.map((product) => (
             <article className="best-card" key={product.id}>
               <Link className="photo" to={`/shirts/${product.slug}`}>
-                {product.primary_image ? <img src={product.primary_image.url} alt={product.name} /> : null}
+                <ImageCarousel images={productSlides(product)} alt={product.name} showArrows={false} />
               </Link>
               <div>
-                <span className="tag sale relative">Bestseller</span>
+                {hasDiscount(product) ? (
+                  <span className="tag sale relative">-{Number(product.discount_percent)}%</span>
+                ) : (
+                  <span className="tag sale relative">Bestseller</span>
+                )}
                 <h3>
                   <Link to={`/shirts/${product.slug}`}>{product.name}</Link>
                 </h3>
-                <p className="price">{money(product.base_price, product.currency)}</p>
+                <p className="price">
+                  {money(saleAmount(product), product.currency)}
+                  {hasDiscount(product) ? <s>{money(product.base_price, product.currency)}</s> : null}
+                </p>
                 <Stars />
                 <p className="muted">
                   Heavy cotton, custom print. Choose a color at checkout and pay before delivery.
@@ -279,7 +300,7 @@ export default function LandingPage() {
               Shop sale now
             </a>
           </div>
-          <img src="/photos/line.jpg" alt="" />
+          <img src={photos.flash_sale} alt="" />
         </div>
         <div className="promo-card collection">
           <div>
@@ -290,7 +311,7 @@ export default function LandingPage() {
               Shop collection
             </a>
           </div>
-          <img src="/photos/collection.jpg" alt="" />
+          <img src={photos.new_collection} alt="" />
         </div>
       </section>
 
@@ -303,11 +324,14 @@ export default function LandingPage() {
           {products.map((product) => (
             <Link className="product-card shop-card" key={product.id} to={`/shirts/${product.slug}`}>
               <div className="photo">
-                {product.primary_image ? <img src={product.primary_image.url} alt={product.name} /> : null}
+                <ImageCarousel images={productSlides(product)} alt={product.name} showArrows={false} />
               </div>
               <div className="meta">
                 <h3>{product.name}</h3>
-                <div className="price">{money(product.base_price, product.currency)}</div>
+                <div className="price">
+                  {money(saleAmount(product), product.currency)}
+                  {hasDiscount(product) ? <s>{money(product.base_price, product.currency)}</s> : null}
+                </div>
                 <div className="swatches">
                   {product.colors.map((color) => (
                     <span key={color.id} className="swatch" style={{ background: color.hex }} title={color.name} />

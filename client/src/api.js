@@ -73,6 +73,15 @@ export function money(value, currency = 'GHS') {
   return `${currency} ${value}`
 }
 
+export function hasDiscount(product) {
+  return Number(product?.discount_percent || 0) > 0
+}
+
+export function saleAmount(product, fallback) {
+  if (product?.sale_price) return product.sale_price
+  return fallback || product?.base_price
+}
+
 export function statusLabel(value) {
   return String(value || '').replaceAll('_', ' ')
 }

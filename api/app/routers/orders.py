@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
@@ -17,10 +17,14 @@ from app.models import (
     OrderItem,
     OrderStatus,
     PaymentMethod,
+    PaymentProof,
+    PaymentProofImage,
+    PaymentProofStatus,
     PaymentStatus,
     Product,
     Variant,
 )
+from app.media import MAX_FILES, save_upload
 from app.money import as_money
 from app.order_machine import assert_transition, should_restore
 from app.schemas import CheckoutIn, OrderOut
@@ -35,6 +39,7 @@ def _order_query():
         selectinload(Order.items),
         selectinload(Order.notes),
         selectinload(Order.events),
+        selectinload(Order.payment_proofs).selectinload(PaymentProof.images),
     )
 
 
@@ -80,7 +85,7 @@ def checkout(payload: CheckoutIn, user: ClientUser, db: DbSession) -> OrderOut:
             item.holds_stock = True
 
     subtotal = sum((as_money(item.unit_price) * item.quantity for item in items), start=as_money(0))
-    fee = as_money(zone.fee)
+    fee = as_money(0)
     order = Order(
         order_number=_next_order_number(db),
         customer_id=user.id,
@@ -190,4 +195,70 @@ def cancel_order(order_id: UUID, user: ClientUser, db: DbSession) -> OrderOut:
     db.add(order)
     db.commit()
     db.refresh(order)
+    return order_out(order)
+
+
+PAYMENT_NETWORKS = {"MTN", "Telecel", "AirtelTigo", "Bank", "Other"}
+
+
+@router.post("/orders/{order_id}/payment-proof", response_model=OrderOut)
+def submit_payment_proof(
+    order_id: UUID,
+    user: ClientUser,
+    db: DbSession,
+    transaction_id: str = Form(...),
+    payment_number: str = Form(...),
+    payment_network: str = Form(...),
+    note: str = Form(""),
+    files: list[UploadFile] = File(...),
+) -> OrderOut:
+    order = db.scalar(_order_query().where(Order.id == order_id, Order.customer_id == user.id))
+    if order is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found.")
+    if order.status == OrderStatus.cancelled.value:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This order is cancelled.")
+    if order.payment_status == PaymentStatus.paid.value:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This order is already marked paid.")
+    network = payment_network.strip()
+    if network not in PAYMENT_NETWORKS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Choose a valid payment network.")
+    txn = transaction_id.strip()
+    number = payment_number.strip()
+    if not txn or not number:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Transaction ID and payment number are required.")
+    uploads = [item for item in files if item and item.filename]
+    if not uploads:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Upload at least one receipt image.")
+    if len(uploads) > MAX_FILES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Upload at most {MAX_FILES} images.")
+
+    for existing in list(order.payment_proofs or []):
+        if existing.status == PaymentProofStatus.pending.value:
+            db.delete(existing)
+
+    proof = PaymentProof(
+        order_id=order.id,
+        transaction_id=txn,
+        payment_number=number,
+        payment_network=network,
+        note=(note or "").strip(),
+        status=PaymentProofStatus.pending.value,
+    )
+    db.add(proof)
+    db.flush()
+    for index, upload in enumerate(uploads):
+        url, public_id = save_upload(order.id, upload, folder=f"receipts/{order.id}")
+        db.add(PaymentProofImage(proof_id=proof.id, url=url, public_id=public_id, sort_order=index))
+    order.payment_method = PaymentMethod.external.value
+    db.add(
+        OrderEvent(
+            order_id=order.id,
+            actor_id=user.id,
+            from_status=order.status,
+            to_status=order.status,
+            note=f"External payment proof submitted ({network} · {txn}).",
+        )
+    )
+    db.commit()
+    order = db.scalar(_order_query().where(Order.id == order.id))
     return order_out(order)

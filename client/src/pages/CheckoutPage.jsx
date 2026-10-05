@@ -10,6 +10,9 @@ export default function CheckoutPage({ session }) {
   const [addressId, setAddressId] = useState('')
   const [zoneId, setZoneId] = useState('')
   const [note, setNote] = useState('')
+  const [payAccount, setPayAccount] = useState('024 903 9110')
+  const [payNetwork, setPayNetwork] = useState('MTN MoMo')
+  const [copied, setCopied] = useState(false)
   const [form, setForm] = useState({
     label: 'Home',
     line1: '',
@@ -35,6 +38,12 @@ export default function CheckoutPage({ session }) {
         if (data.items?.[0]) setZoneId(data.items[0].id)
       })
       .catch((err) => setError(err.message))
+    request('/storefront')
+      .then((data) => {
+        if (data.payment_account) setPayAccount(data.payment_account)
+        if (data.payment_network) setPayNetwork(data.payment_network)
+      })
+      .catch(() => {})
   }, [session.token])
 
   async function addAddress(event) {
@@ -50,6 +59,16 @@ export default function CheckoutPage({ session }) {
       setAddressId(created.id)
     } catch (err) {
       setError(err.message)
+    }
+  }
+
+  async function copyAccount() {
+    try {
+      await navigator.clipboard.writeText(payAccount.replaceAll(' ', ''))
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1600)
+    } catch {
+      setCopied(false)
     }
   }
 
@@ -75,10 +94,9 @@ export default function CheckoutPage({ session }) {
     }
   }
 
-  const zone = zones.find((row) => row.id === zoneId)
-  const total = cart && zone ? (Number(cart.subtotal) + Number(zone.fee)).toFixed(2) : cart?.subtotal
+  const total = cart?.subtotal
 
-  if (!cart) return <p className="wrap muted">Loading checkout…</p>
+  if (!cart) return <p className="wrap muted">{error || 'Loading checkout…'}</p>
   if (cart.items.length === 0) {
     return (
       <main className="panel">
@@ -90,10 +108,19 @@ export default function CheckoutPage({ session }) {
   }
 
   return (
-    <main className="panel wide">
+    <main className="panel wide checkout">
       <h1>Checkout</h1>
-      <p className="muted">Payment before delivery. Pay first, then we ship nationwide.</p>
+      <p className="muted">Pay to the account below, then submit the order.</p>
       {error ? <p className="error">{error}</p> : null}
+
+      <section className="pay-card">
+        <p className="pay-kicker">Pay to account</p>
+        <p className="pay-network">{payNetwork}</p>
+        <p className="pay-number">{payAccount}</p>
+        <button type="button" className="btn ghost" onClick={copyAccount}>
+          {copied ? 'Copied' : 'Copy number'}
+        </button>
+      </section>
 
       <h2>Delivery address</h2>
       {addresses.length ? (
@@ -119,23 +146,21 @@ export default function CheckoutPage({ session }) {
       </form>
 
       <h2>Zone</h2>
-      <select value={zoneId} onChange={(e) => setZoneId(e.target.value)}>
-        {zones.map((row) => (
-          <option key={row.id} value={row.id}>
-            {row.name} — {money(row.fee)}
-          </option>
-        ))}
-      </select>
-      <label>Note for the rider</label>
-      <textarea value={note} onChange={(e) => setNote(e.target.value)} />
-
-      <p>
-        Subtotal {money(cart.subtotal)} · Delivery {zone ? money(zone.fee) : '—'} ·{' '}
-        <strong>Total {money(total)}</strong>
-      </p>
-      <form onSubmit={placeOrder}>
+      <form className="checkout-pay" onSubmit={placeOrder}>
+        <select value={zoneId} onChange={(e) => setZoneId(e.target.value)}>
+          {zones.map((row) => (
+            <option key={row.id} value={row.id}>
+              {row.name}
+            </option>
+          ))}
+        </select>
+        <label>Note for the rider</label>
+        <textarea value={note} onChange={(e) => setNote(e.target.value)} />
+        <p>
+          <strong>Total {money(total)}</strong>
+        </p>
         <button className="btn" type="submit" disabled={busy || !addressId || !zoneId}>
-          Place order · pay before delivery
+          {busy ? 'Submitting…' : 'Submit Order'}
         </button>
       </form>
     </main>

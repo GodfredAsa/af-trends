@@ -4,9 +4,10 @@ from sqlalchemy.orm import selectinload
 
 from app.cart_hold import release_expired_carts
 from app.deps import DbSession, Pagination
-from app.models import ColorPalette, Product, ProductColor, ProductSize, SIZES, Variant
+from app.models import ColorPalette, Product, ProductColor, ProductSize, SIZES, StorefrontAsset, Variant
 from app.schemas import ProductOut, SizeListOut
-from app.serializers import color_out, page, product_list_item, product_out
+from app.serializers import color_out, get_settings, page, product_list_item, product_out
+from app.storefront import STOREFRONT_SLOTS
 
 router = APIRouter()
 
@@ -79,3 +80,18 @@ def list_colors(db: DbSession):
 @router.get("/catalog/sizes", response_model=SizeListOut)
 def list_sizes() -> SizeListOut:
     return SizeListOut(items=SIZES)
+
+
+@router.get("/storefront")
+def public_storefront(db: DbSession):
+    rows = {row.key: row for row in db.scalars(select(StorefrontAsset)).all()}
+    assets = {}
+    for slot in STOREFRONT_SLOTS:
+        row = rows.get(slot["key"])
+        assets[slot["key"]] = row.url if row and row.url else slot["fallback"]
+    settings = get_settings(db)
+    return {
+        "assets": assets,
+        "payment_account": getattr(settings, "payment_account", None) or "024 903 9110",
+        "payment_network": getattr(settings, "payment_network", None) or "MTN MoMo",
+    }

@@ -1,20 +1,20 @@
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, File, HTTPException, UploadFile, status
 from sqlalchemy import select
 
 from app.deps import DbSession, SettingsAdmin
-from app.models import DeliveryZone
+from app.media import destroy_upload, save_upload
+from app.models import DeliveryZone, StorefrontAsset
 from app.money import money_str
-from app.schemas import SettingsOut, SettingsPatch, ZoneCreate, ZoneOut, ZonePatch
+from app.schemas import SettingsOut, SettingsPatch, StorefrontAssetOut, ZoneCreate, ZoneOut, ZonePatch
 from app.serializers import get_settings
+from app.storefront import STOREFRONT_SLOTS, slot_map
 
 router = APIRouter()
 
 
-@router.get("/settings", response_model=SettingsOut)
-def read_settings(_admin: SettingsAdmin, db: DbSession) -> SettingsOut:
-    row = get_settings(db)
+def _settings_out(row) -> SettingsOut:
     return SettingsOut(
         store_name=row.store_name,
         support_email=row.support_email,
@@ -22,7 +22,25 @@ def read_settings(_admin: SettingsAdmin, db: DbSession) -> SettingsOut:
         currency=row.currency,
         cod_instructions=row.cod_instructions,
         low_stock_threshold=row.low_stock_threshold,
+        payment_account=getattr(row, "payment_account", None) or "024 903 9110",
+        payment_network=getattr(row, "payment_network", None) or "MTN MoMo",
     )
+
+
+def _asset_out(slot: dict, row: StorefrontAsset | None) -> StorefrontAssetOut:
+    return StorefrontAssetOut(
+        key=slot["key"],
+        label=slot["label"],
+        hint=slot["hint"],
+        url=(row.url if row and row.url else slot["fallback"]),
+        fallback=slot["fallback"],
+    )
+
+
+@router.get("/settings", response_model=SettingsOut)
+def read_settings(_admin: SettingsAdmin, db: DbSession) -> SettingsOut:
+    row = get_settings(db)
+    return _settings_out(row)
 
 
 @router.patch("/settings", response_model=SettingsOut)
@@ -34,14 +52,7 @@ def patch_settings(payload: SettingsPatch, _admin: SettingsAdmin, db: DbSession)
     db.add(row)
     db.commit()
     db.refresh(row)
-    return SettingsOut(
-        store_name=row.store_name,
-        support_email=row.support_email,
-        support_phone=row.support_phone,
-        currency=row.currency,
-        cod_instructions=row.cod_instructions,
-        low_stock_threshold=row.low_stock_threshold,
-    )
+    return _settings_out(row)
 
 
 @router.get("/delivery-zones")
@@ -76,3 +87,29 @@ def patch_zone(zone_id: UUID, payload: ZonePatch, _admin: SettingsAdmin, db: DbS
     db.commit()
     db.refresh(zone)
     return ZoneOut(id=zone.id, name=zone.name, fee=money_str(zone.fee), is_active=zone.is_active)
+
+
+@router.get("/storefront")
+def list_storefront(_admin: SettingsAdmin, db: DbSession):
+    rows = {row.key: row for row in db.scalars(select(StorefrontAsset)).all()}
+    return {"items": [_asset_out(slot, rows.get(slot["key"])) for slot in STOREFRONT_SLOTS]}
+
+
+@router.post("/storefront/{key}", response_model=StorefrontAssetOut)
+def upload_storefront(key: str, _admin: SettingsAdmin, db: DbSession, file: UploadFile = File(...)) -> StorefrontAssetOut:
+    slot = slot_map().get(key)
+    if slot is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown storefront photo.")
+    row = db.get(StorefrontAsset, key)
+    url, public_id = save_upload(key, file, folder=f"storefront/{key}")
+    if row is None:
+        row = StorefrontAsset(key=key, label=slot["label"], url=url, public_id=public_id)
+    else:
+        destroy_upload(row.public_id or "")
+        row.url = url
+        row.public_id = public_id
+        row.label = slot["label"]
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return _asset_out(slot, row)

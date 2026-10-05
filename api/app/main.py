@@ -21,12 +21,15 @@ from app.routers import (
     staff_stock,
     staff_users,
 )
+from app import models  # noqa: F401 — register tables for create_all
 from app.seed import seed_if_empty
 from app.serializers import get_settings
 
 settings.media_path.mkdir(parents=True, exist_ok=True)
 (settings.media_path / "products").mkdir(parents=True, exist_ok=True)
 (settings.media_path / "catalog").mkdir(parents=True, exist_ok=True)
+(settings.media_path / "receipts").mkdir(parents=True, exist_ok=True)
+(settings.media_path / "storefront").mkdir(parents=True, exist_ok=True)
 
 Base.metadata.create_all(bind=engine)
 ensure_schema()

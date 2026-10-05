@@ -47,6 +47,7 @@ export default function ProductForm({ session }) {
           description: data.description,
           cost_price: data.cost_price || '0.00',
           selling_price: data.base_price,
+          discount_percent: data.discount_percent || '0',
           colorIds: data.colors.map((color) => color.id),
           sizes: data.sizes,
           qty,
@@ -78,6 +79,7 @@ export default function ProductForm({ session }) {
         sizes: form.sizes,
         is_published: isNew ? false : published,
         is_new_arrival: !!form.is_new_arrival,
+        discount_percent: Number(form.discount_percent || 0),
       }
       if (isNew) body.variants = buildVariants(form)
       const saved = isNew

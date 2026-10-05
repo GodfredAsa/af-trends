@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { money, request } from '../../api.js'
 import { PRIV, can } from '../../privileges.js'
 import AddShirtModal from '../../components/AddShirtModal.jsx'
+import ImageCarousel, { productSlides } from '../../components/ImageCarousel.jsx'
 import { IconSearch, IconShirt } from '../../components/Icons.jsx'
 
 const PAGE_SIZES = [8, 16, 24]
@@ -207,8 +208,8 @@ export default function StaffProducts({ session }) {
           return (
             <article key={product.id} className="shirt-card">
               <Link className="shirt-photo" to={`/staff/products/${product.id}`}>
-                {product.primary_image ? (
-                  <img src={product.primary_image.url} alt="" />
+                {productSlides(product).length ? (
+                  <ImageCarousel images={productSlides(product)} alt="" showArrows={false} />
                 ) : (
                   <span className="shirt-ph">
                     <IconShirt />
@@ -238,7 +239,12 @@ export default function StaffProducts({ session }) {
                 </div>
                 <div className="shirt-meta">
                   <div>
-                    <strong>{money(product.base_price, product.currency)}</strong>
+                    <strong>
+                      {money(product.sale_price || product.base_price, product.currency)}
+                      {Number(product.discount_percent) > 0 ? (
+                        <span className="muted"> · {Number(product.discount_percent)}% off</span>
+                      ) : null}
+                    </strong>
                     <span className="muted">Cost {money(product.cost_price, product.currency)}</span>
                   </div>
                 </div>

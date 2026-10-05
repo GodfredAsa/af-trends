@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { request } from '../api.js'
+import FileDropzone from './FileDropzone.jsx'
 import ShirtEditorFields, { buildVariants, emptyShirtForm } from './ShirtEditorFields.jsx'
 
 export default function AddShirtModal({ session, palette: paletteProp, mode = 'stock', onClose, onCreated, onPaletteChange }) {
@@ -7,6 +8,7 @@ export default function AddShirtModal({ session, palette: paletteProp, mode = 's
   const [form, setForm] = useState(() => emptyShirtForm(paletteProp || []))
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [photos, setPhotos] = useState([])
 
   useEffect(() => {
     if (paletteProp?.length) {
@@ -59,6 +61,7 @@ export default function AddShirtModal({ session, palette: paletteProp, mode = 's
                 variants,
                 is_published: false,
                 is_new_arrival: !!form.is_new_arrival,
+                discount_percent: Number(form.discount_percent || 0),
               },
             })
           : await request('/staff/stock', {
@@ -73,9 +76,20 @@ export default function AddShirtModal({ session, palette: paletteProp, mode = 's
                 sizes: form.sizes,
                 variants,
                 is_new_arrival: !!form.is_new_arrival,
+                discount_percent: Number(form.discount_percent || 0),
               },
             })
       onCreated?.(saved)
+      if (photos.length && saved?.id) {
+        const payload = new FormData()
+        photos.forEach((file) => payload.append('files', file))
+        payload.append('color_id', form.colorIds[0])
+        await request(`/staff/products/${saved.id}/images`, {
+          method: 'POST',
+          token: session.token,
+          form: payload,
+        })
+      }
       onClose()
     } catch (err) {
       setError(err.message)
@@ -87,8 +101,8 @@ export default function AddShirtModal({ session, palette: paletteProp, mode = 's
   const title = mode === 'catalog' ? 'New shirt' : 'Add t-shirt'
   const hint =
     mode === 'catalog'
-      ? 'Create a draft, then add photos on the next screen before publishing.'
-      : 'Receive units into inventory. The shirt stays a draft until you add photos on Shirts.'
+      ? 'Add photos here. You can still edit them after saving.'
+      : 'Receive units into inventory. Photos added here show on the shirt after you publish.'
 
   return (
     <div className="modal-back sheet" onClick={() => !busy && onClose()} role="presentation">
@@ -125,6 +139,11 @@ export default function AddShirtModal({ session, palette: paletteProp, mode = 's
               onPaletteChange?.(colors)
             }}
           />
+          <section className="form-block">
+            <p className="form-kicker">4. Photos</p>
+            <p className="muted qty-hint">JPEG, PNG, or WebP. Tagged to the first colour you selected.</p>
+            <FileDropzone files={photos} onChange={setPhotos} title="Drop your files here or browse" />
+          </section>
         </div>
 
         <div className="modal-foot">

@@ -51,6 +51,13 @@ class PaymentStatus(str, enum.Enum):
 
 class PaymentMethod(str, enum.Enum):
     cash_on_delivery = "cash_on_delivery"
+    external = "external"
+
+
+class PaymentProofStatus(str, enum.Enum):
+    pending = "pending"
+    approved = "approved"
+    rejected = "rejected"
 
 
 STAFF_ROLES = {UserRole.support, UserRole.manager, UserRole.superadmin}
@@ -124,6 +131,8 @@ class StoreSettings(Base):
     )
     low_stock_threshold: Mapped[int] = mapped_column(Integer, default=5)
     privilege_matrix: Mapped[str] = mapped_column(Text, default="")
+    payment_account: Mapped[str] = mapped_column(String(64), default="024 903 9110")
+    payment_network: Mapped[str] = mapped_column(String(64), default="MTN MoMo")
 
 
 class DeliveryZone(Base):
@@ -144,6 +153,7 @@ class Product(Base):
     description: Mapped[str] = mapped_column(Text, default="")
     base_price: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     cost_price: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("0.00"))
+    discount_percent: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal("0.00"))
     is_published: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     is_new_arrival: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -274,6 +284,11 @@ class Order(Base):
     items: Mapped[list["OrderItem"]] = relationship(back_populates="order", cascade="all, delete-orphan")
     notes: Mapped[list["OrderNote"]] = relationship(back_populates="order", cascade="all, delete-orphan")
     events: Mapped[list["OrderEvent"]] = relationship(back_populates="order", cascade="all, delete-orphan")
+    payment_proofs: Mapped[list["PaymentProof"]] = relationship(
+        back_populates="order",
+        cascade="all, delete-orphan",
+        order_by="PaymentProof.created_at",
+    )
 
 
 class OrderItem(Base):
@@ -309,6 +324,42 @@ class OrderNote(Base):
     author: Mapped[User] = relationship()
 
 
+class PaymentProof(Base):
+    __tablename__ = "payment_proofs"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=new_uuid)
+    order_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("orders.id"), index=True)
+    transaction_id: Mapped[str] = mapped_column(String(128))
+    payment_number: Mapped[str] = mapped_column(String(64))
+    payment_network: Mapped[str] = mapped_column(String(64))
+    note: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(32), default=PaymentProofStatus.pending.value, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reviewer_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    review_note: Mapped[str] = mapped_column(Text, default="")
+
+    order: Mapped[Order] = relationship(back_populates="payment_proofs")
+    reviewer: Mapped[User | None] = relationship()
+    images: Mapped[list["PaymentProofImage"]] = relationship(
+        back_populates="proof",
+        cascade="all, delete-orphan",
+        order_by="PaymentProofImage.sort_order",
+    )
+
+
+class PaymentProofImage(Base):
+    __tablename__ = "payment_proof_images"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=new_uuid)
+    proof_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("payment_proofs.id"), index=True)
+    url: Mapped[str] = mapped_column(String(512))
+    public_id: Mapped[str] = mapped_column(String(255), default="")
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+
+    proof: Mapped[PaymentProof] = relationship(back_populates="images")
+
+
 class OrderEvent(Base):
     __tablename__ = "order_events"
 
@@ -322,3 +373,13 @@ class OrderEvent(Base):
 
     order: Mapped[Order] = relationship(back_populates="events")
     actor: Mapped[User | None] = relationship()
+
+
+class StorefrontAsset(Base):
+    __tablename__ = "storefront_assets"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    label: Mapped[str] = mapped_column(String(128))
+    url: Mapped[str] = mapped_column(String(512), default="")
+    public_id: Mapped[str] = mapped_column(String(255), default="")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

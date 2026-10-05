@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, status
@@ -6,9 +7,9 @@ from sqlalchemy.orm import selectinload
 
 from app.cart_hold import restore_order_items, take_stock
 from app.deps import OrderCollector, OrderDeleter, StaffUser, DbSession, Pagination
-from app.models import STOCK_RESERVED_STATUSES, Order, OrderEvent, OrderNote, OrderStatus, PaymentStatus, User, UserRole, Variant
+from app.models import STOCK_RESERVED_STATUSES, Order, OrderEvent, OrderNote, OrderStatus, PaymentMethod, PaymentProof, PaymentProofStatus, PaymentStatus, User, UserRole, Variant
 from app.order_machine import assert_transition, should_deduct, should_restore
-from app.schemas import NoteIn, OrderOut, PaymentPatch, StatusPatch
+from app.schemas import NoteIn, OrderOut, PaymentPatch, PaymentProofReview, StatusPatch
 from app.serializers import can_purge_order, order_out, order_purge_at
 
 router = APIRouter()
@@ -20,6 +21,7 @@ def _staff_query():
         selectinload(Order.items),
         selectinload(Order.notes).selectinload(OrderNote.author),
         selectinload(Order.events),
+        selectinload(Order.payment_proofs).selectinload(PaymentProof.images),
     )
 
 
@@ -120,6 +122,35 @@ def patch_status(order_id: UUID, payload: StatusPatch, user: StaffUser, db: DbSe
     )
     order.status = nxt
     db.add(order)
+    db.commit()
+    return order_out(_get(db, order.id), include_staff=True, actor=user)
+
+
+@router.patch("/orders/{order_id}/payment-proof", response_model=OrderOut)
+def review_payment_proof(order_id: UUID, payload: PaymentProofReview, user: OrderCollector, db: DbSession) -> OrderOut:
+    order = _get(db, order_id)
+    pending = next((row for row in (order.payment_proofs or []) if row.status == PaymentProofStatus.pending.value), None)
+    if pending is None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="There is no payment proof waiting for review.")
+    pending.status = payload.status
+    pending.reviewer_id = user.id
+    pending.reviewed_at = datetime.now(timezone.utc)
+    pending.review_note = payload.note.strip()
+    if payload.status == PaymentProofStatus.approved.value:
+        order.payment_status = PaymentStatus.paid.value
+        order.payment_method = PaymentMethod.external.value
+        event_note = "External payment approved."
+    else:
+        event_note = "External payment proof rejected."
+    db.add(
+        OrderEvent(
+            order_id=order.id,
+            actor_id=user.id,
+            from_status=order.status,
+            to_status=order.status,
+            note=event_note,
+        )
+    )
     db.commit()
     return order_out(_get(db, order.id), include_staff=True, actor=user)
 

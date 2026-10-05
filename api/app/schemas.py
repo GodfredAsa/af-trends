@@ -129,10 +129,13 @@ class ProductListItem(BaseModel):
     name: str
     base_price: str
     cost_price: str = "0.00"
+    discount_percent: str = "0.00"
+    sale_price: str | None = None
     currency: str = "GHS"
     is_published: bool = True
     is_new_arrival: bool = False
     primary_image: ImageOut | None = None
+    images: list[ImageOut] = []
     colors: list[ColorOut]
     sizes: list[str] = []
     total_units: int = 0
@@ -145,6 +148,8 @@ class ProductOut(BaseModel):
     description: str
     base_price: str
     cost_price: str = "0.00"
+    discount_percent: str = "0.00"
+    sale_price: str | None = None
     currency: str = "GHS"
     is_published: bool
     is_new_arrival: bool = False
@@ -165,6 +170,7 @@ class ProductCreate(BaseModel):
     variants: list[VariantIn] | None = None
     is_published: bool = False
     is_new_arrival: bool = False
+    discount_percent: Decimal = Field(default=Decimal("0.00"), ge=0, le=100)
 
 
 class ProductPatch(BaseModel):
@@ -177,6 +183,7 @@ class ProductPatch(BaseModel):
     sizes: list[str] | None = None
     is_published: bool | None = None
     is_new_arrival: bool | None = None
+    discount_percent: Decimal | None = Field(default=None, ge=0, le=100)
 
 
 class StockColorQty(BaseModel):
@@ -192,6 +199,8 @@ class StockItemOut(BaseModel):
     name: str
     cost_price: str
     selling_price: str
+    discount_percent: str = "0.00"
+    sale_price: str | None = None
     currency: str = "GHS"
     total_units: int
     label: str
@@ -211,6 +220,7 @@ class StockCreate(BaseModel):
     variants: list[VariantIn]
     is_published: bool = False
     is_new_arrival: bool = False
+    discount_percent: Decimal = Field(default=Decimal("0.00"), ge=0, le=100)
 
 
 class Page(BaseModel):
@@ -358,6 +368,29 @@ class OrderEventOut(OrmModel):
     created_at: datetime
 
 
+class PaymentProofImageOut(BaseModel):
+    id: UUID
+    url: str
+
+
+class PaymentProofOut(BaseModel):
+    id: UUID
+    transaction_id: str
+    payment_number: str
+    payment_network: str
+    note: str = ""
+    status: str
+    created_at: datetime
+    reviewed_at: datetime | None = None
+    review_note: str = ""
+    images: list[PaymentProofImageOut] = []
+
+
+class PaymentProofReview(BaseModel):
+    status: Literal["approved", "rejected"]
+    note: str = ""
+
+
 class OrderOut(BaseModel):
     id: UUID
     order_number: str
@@ -379,6 +412,7 @@ class OrderOut(BaseModel):
     updated_at: datetime
     can_delete: bool = False
     deletable_after: datetime | None = None
+    payment_proofs: list[PaymentProofOut] = []
 
 
 class StatusPatch(BaseModel):
@@ -417,6 +451,8 @@ class SettingsOut(BaseModel):
     currency: str
     cod_instructions: str
     low_stock_threshold: int
+    payment_account: str = "024 903 9110"
+    payment_network: str = "MTN MoMo"
 
 
 class SettingsPatch(BaseModel):
@@ -426,6 +462,16 @@ class SettingsPatch(BaseModel):
     currency: str | None = None
     cod_instructions: str | None = None
     low_stock_threshold: int | None = Field(default=None, ge=0)
+    payment_account: str | None = Field(default=None, max_length=64)
+    payment_network: str | None = Field(default=None, max_length=64)
+
+
+class StorefrontAssetOut(BaseModel):
+    key: str
+    label: str
+    hint: str = ""
+    url: str
+    fallback: str = ""
 
 
 class PrivilegeItem(BaseModel):

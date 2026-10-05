@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { request } from '../../api.js'
 
 function asHex(value) {
@@ -13,13 +13,19 @@ export default function StaffSettings({ session }) {
   const [colors, setColors] = useState([])
   const [drafts, setDrafts] = useState({})
   const [color, setColor] = useState({ name: '', hex: '#2A3B30' })
+  const [assets, setAssets] = useState([])
   const [error, setError] = useState('')
   const [busyId, setBusyId] = useState('')
+  const assetInput = useRef(null)
+  const pendingAsset = useRef('')
 
   function load() {
     request('/staff/settings', { token: session.token }).then(setSettings).catch((err) => setError(err.message))
     request('/staff/delivery-zones', { token: session.token })
       .then((data) => setZones(data.items || []))
+      .catch((err) => setError(err.message))
+    request('/staff/storefront', { token: session.token })
+      .then((data) => setAssets(data.items || []))
       .catch((err) => setError(err.message))
     request('/staff/palette/colors', { token: session.token })
       .then((data) => {
@@ -100,6 +106,30 @@ export default function StaffSettings({ session }) {
     }
   }
 
+  async function uploadAsset(event) {
+    const file = event.target.files?.[0]
+    const key = pendingAsset.current
+    event.target.value = ''
+    pendingAsset.current = ''
+    if (!file || !key) return
+    setError('')
+    setBusyId(key)
+    const payload = new FormData()
+    payload.append('file', file)
+    try {
+      const saved = await request(`/staff/storefront/${key}`, {
+        method: 'POST',
+        token: session.token,
+        form: payload,
+      })
+      setAssets((current) => current.map((item) => (item.key === saved.key ? saved : item)))
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusyId('')
+    }
+  }
+
   async function removeColor(item) {
     if (!window.confirm(`Remove ${item.name} from the palette?`)) return
     setError('')
@@ -121,7 +151,7 @@ export default function StaffSettings({ session }) {
       <header className="dash-head">
         <div>
           <h1>Settings</h1>
-          <p>Store copy, delivery zones, and the shirt colour palette.</p>
+          <p>Store copy, homepage photos, delivery zones, and the shirt colour palette.</p>
         </div>
       </header>
       {error ? <p className="error">{error}</p> : null}
@@ -132,6 +162,16 @@ export default function StaffSettings({ session }) {
         <input value={settings.support_email} onChange={(e) => setSettings({ ...settings, support_email: e.target.value })} />
         <label>Support phone</label>
         <input value={settings.support_phone} onChange={(e) => setSettings({ ...settings, support_phone: e.target.value })} />
+        <label>Pay-to network</label>
+        <input
+          value={settings.payment_network || ''}
+          onChange={(e) => setSettings({ ...settings, payment_network: e.target.value })}
+        />
+        <label>Pay-to account</label>
+        <input
+          value={settings.payment_account || ''}
+          onChange={(e) => setSettings({ ...settings, payment_account: e.target.value })}
+        />
         <label>Cash on delivery note</label>
         <textarea
           value={settings.cod_instructions}
@@ -141,6 +181,39 @@ export default function StaffSettings({ session }) {
           Save settings
         </button>
       </form>
+      <section className="edit-card">
+        <h2>Homepage photos</h2>
+        <p className="muted qty-hint">Replace the lookbook of the lady in red and the other photos on the storefront.</p>
+        <input
+          ref={assetInput}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          hidden
+          onChange={uploadAsset}
+        />
+        <ul className="storefront-slots">
+          {assets.map((item) => (
+            <li key={item.key} className="storefront-slot">
+              <img src={item.url} alt={item.label} />
+              <div>
+                <strong>{item.label}</strong>
+                <p className="muted">{item.hint}</p>
+              </div>
+              <button
+                type="button"
+                className="btn ghost"
+                disabled={busyId === item.key}
+                onClick={() => {
+                  pendingAsset.current = item.key
+                  assetInput.current?.click()
+                }}
+              >
+                {busyId === item.key ? 'Uploading…' : 'Replace photo'}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
       <section className="edit-card">
         <h2>Delivery zones</h2>
         <ul>

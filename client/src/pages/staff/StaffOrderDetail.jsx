@@ -54,6 +54,24 @@ export default function StaffOrderDetail({ session }) {
     }
   }
 
+  async function reviewProof(status) {
+    const note = window.prompt(status === 'approved' ? 'Note for the customer (optional)' : 'Why is this receipt rejected?') || ''
+    if (status === 'rejected' && !note.trim()) {
+      setError('Add a short reason when rejecting a receipt.')
+      return
+    }
+    try {
+      const next = await request(`/staff/orders/${id}/payment-proof`, {
+        method: 'PATCH',
+        token: session.token,
+        body: { status, note },
+      })
+      setOrder(next)
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
   async function collect() {
     try {
       const next = await request(`/staff/orders/${id}/payment`, {
@@ -144,8 +162,41 @@ export default function StaffOrderDetail({ session }) {
         </div>
       ))}
       <p>
-        Total <strong>{money(order.total, order.currency)}</strong> due on delivery
+        Total <strong>{money(order.total, order.currency)}</strong> due unless an external receipt is approved
       </p>
+      {(order.payment_proofs || []).length ? (
+        <section className="proof-box">
+          <h2>External payment</h2>
+          {order.payment_proofs.map((proof) => (
+            <div key={proof.id} className="proof-item">
+              <p>
+                {proof.payment_network} · {proof.payment_number} · ID {proof.transaction_id}
+              </p>
+              <p>
+                <span className="badge">{statusLabel(proof.status)}</span>
+              </p>
+              {proof.note ? <p className="muted">{proof.note}</p> : null}
+              <div className="proof-thumbs">
+                {(proof.images || []).map((image) => (
+                  <a key={image.id} href={image.url} target="_blank" rel="noreferrer">
+                    <img src={image.url} alt="Receipt" />
+                  </a>
+                ))}
+              </div>
+              {canPay && proof.status === 'pending' ? (
+                <div className="row-actions">
+                  <button type="button" className="btn" onClick={() => reviewProof('approved')}>
+                    Approve payment
+                  </button>
+                  <button type="button" className="btn ghost" onClick={() => reviewProof('rejected')}>
+                    Reject
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </section>
+      ) : null}
       <div className="row-actions">
         {actions.map((value) => (
           <button key={value} type="button" className="btn ghost" onClick={() => setStatus(value)}>

@@ -10,6 +10,7 @@ export function emptyShirtForm(palette = []) {
     description: '',
     cost_price: '60.00',
     selling_price: '120.00',
+    discount_percent: '0',
     colorIds: palette.slice(0, 2).map((color) => color.id),
     sizes: ['S', 'M', 'L', 'XL'],
     qty: {},
@@ -139,6 +140,18 @@ export default function ShirtEditorFields({
               value={form.selling_price}
               onChange={(event) => patch({ selling_price: event.target.value })}
               required
+              disabled={disabled}
+            />
+          </div>
+          <div>
+            <label htmlFor="shirt-discount">Discount (%)</label>
+            <input
+              id="shirt-discount"
+              inputMode="decimal"
+              min="0"
+              max="100"
+              value={form.discount_percent ?? '0'}
+              onChange={(event) => patch({ discount_percent: event.target.value })}
               disabled={disabled}
             />
           </div>
