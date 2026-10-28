@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 from uuid import UUID
 
-from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Query, UploadFile, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
@@ -28,7 +28,8 @@ from app.media import MAX_FILES, save_upload
 from app.money import as_money
 from app.order_machine import assert_transition, should_restore
 from app.schemas import CheckoutIn, OrderOut
-from app.serializers import image_for_variant, order_out
+from app.serializers import image_for_variant, order_out, product_available
+from app.sms import order_sms_payload, send_order_sms
 
 router = APIRouter()
 
@@ -51,7 +52,7 @@ def _next_order_number(db) -> str:
 
 
 @router.post("/orders", response_model=OrderOut, status_code=status.HTTP_201_CREATED)
-def checkout(payload: CheckoutIn, user: ClientUser, db: DbSession) -> OrderOut:
+def checkout(payload: CheckoutIn, user: ClientUser, db: DbSession, background: BackgroundTasks) -> OrderOut:
     release_expired_carts(db)
     owner = resolve_owner(user, None)
     if owner is None:
@@ -70,12 +71,14 @@ def checkout(payload: CheckoutIn, user: ClientUser, db: DbSession) -> OrderOut:
     address = db.get(Address, payload.address_id)
     if address is None or address.user_id != user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Address not found.")
-    zone = db.get(DeliveryZone, payload.delivery_zone_id)
-    if zone is None or not zone.is_active:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Delivery zone not found.")
+    zone = None
+    if payload.delivery_zone_id:
+        zone = db.get(DeliveryZone, payload.delivery_zone_id)
+        if zone is None or not zone.is_active:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Delivery zone not found.")
 
     for item in items:
-        if not item.variant.product.is_published or item.variant.product.deleted_at:
+        if not product_available(item.variant.product, db):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"{item.variant.product.name} in {item.variant.color.name} / {item.variant.size} is no longer available.",
@@ -97,8 +100,8 @@ def checkout(payload: CheckoutIn, user: ClientUser, db: DbSession) -> OrderOut:
         total=subtotal + fee,
         currency="GHS",
         customer_note=payload.customer_note.strip(),
-        delivery_zone_id=zone.id,
-        zone_name=zone.name,
+        delivery_zone_id=zone.id if zone else None,
+        zone_name=zone.name if zone else "",
         address_label=address.label,
         address_line1=address.line1,
         address_line2=address.line2,
@@ -139,6 +142,7 @@ def checkout(payload: CheckoutIn, user: ClientUser, db: DbSession) -> OrderOut:
     )
     db.commit()
     order = db.scalar(_order_query().where(Order.id == order.id))
+    background.add_task(send_order_sms, order_sms_payload(order))
     return order_out(order, include_staff=False)
 
 

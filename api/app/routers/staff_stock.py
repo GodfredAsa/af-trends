@@ -7,7 +7,7 @@ from app.deps import CatalogEditor, CatalogReader, DbSession
 from app.media import slugify
 from app.models import Product, ProductColor, Variant
 from app.schemas import StockCreate, StockItemOut
-from app.serializers import get_settings, page, stock_item_out
+from app.serializers import apply_demo_filter, get_settings, page, stock_item_out
 
 router = APIRouter()
 
@@ -50,7 +50,7 @@ def list_stock(
             detail="page_size must be 5, 15, or 25.",
         )
     threshold = get_settings(db).low_stock_threshold
-    rows = list(db.scalars(_query().order_by(Product.created_at.desc())).all())
+    rows = list(db.scalars(apply_demo_filter(_query(), db).order_by(Product.created_at.desc())).all())
     total = len(rows)
     start = (page_num - 1) * page_size
     sliced = rows[start : start + page_size]

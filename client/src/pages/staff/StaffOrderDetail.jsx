@@ -147,7 +147,7 @@ export default function StaffOrderDetail({ session }) {
         {order.customer.full_name} · {order.customer.phone} · {order.customer.email}
       </p>
       <p>
-        {order.delivery_address.line1}, {order.delivery_address.city} · {order.delivery_zone.name}
+        {order.delivery_address.line1}, {order.delivery_address.city}
       </p>
       {order.items.map((item) => (
         <div className="order-line" key={item.id}>

@@ -16,7 +16,7 @@ from app.cart_hold import (
 from app.deps import DbSession, OptionalUser
 from app.models import CartItem, Product, Variant
 from app.schemas import CartItemIn, CartItemPatch, CartOut
-from app.serializers import cart_out, variant_price
+from app.serializers import cart_out, product_available, variant_price
 
 router = APIRouter()
 
@@ -60,7 +60,7 @@ def add_item(payload: CartItemIn, db: DbSession, user: OptionalUser, x_cart_key:
     release_expired_carts(db)
     owner = _require_owner(user, x_cart_key)
     variant = db.get(Variant, payload.variant_id)
-    if variant is None or variant.product.deleted_at or not variant.product.is_published:
+    if variant is None or not product_available(variant.product, db):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="That shirt is not available.")
     existing = db.scalar(
         select(CartItem).where(CartItem.owner_key == owner.owner_key, CartItem.variant_id == variant.id)

@@ -58,6 +58,24 @@ def currency(db: Session) -> str:
     return get_settings(db).currency
 
 
+def test_mode_on(db: Session) -> bool:
+    return bool(getattr(get_settings(db), "test_mode", False))
+
+
+def apply_demo_filter(stmt, db: Session):
+    if not test_mode_on(db):
+        stmt = stmt.where(Product.is_demo.is_(False))
+    return stmt
+
+
+def product_available(product: Product | None, db: Session) -> bool:
+    if product is None or product.deleted_at or not product.is_published:
+        return False
+    if getattr(product, "is_demo", False) and not test_mode_on(db):
+        return False
+    return True
+
+
 def variant_price(variant: Variant) -> Decimal:
     if variant.price is not None:
         base = as_money(variant.price)
@@ -321,11 +339,15 @@ def order_out(order: Order, include_staff: bool = False, actor: User | None = No
             region=order.address_region,
             notes=order.address_notes,
         ),
-        delivery_zone=ZoneOut(
-            id=order.delivery_zone_id,
-            name=order.zone_name,
-            fee=money_str(order.delivery_fee),
-            is_active=True,
+        delivery_zone=(
+            ZoneOut(
+                id=order.delivery_zone_id,
+                name=order.zone_name or "",
+                fee=money_str(order.delivery_fee),
+                is_active=True,
+            )
+            if order.delivery_zone_id
+            else None
         ),
         items=[
             OrderItemOut(

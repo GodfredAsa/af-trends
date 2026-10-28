@@ -891,9 +891,9 @@ Do not start until this README is signed off. Suggested order:
 
 Seed users for development (passwords in `.env`, never committed as production secrets):
 
-| Email | Role |
+| Login | Role |
 | --- | --- |
-| `superadmin@aftrends.com` | superadmin |
+| `superadmin@aftrends.com` or `0548670632` / `1234` | superadmin |
 | `manager@aftrends.com` | manager |
 | `support@aftrends.com` | support |
 | `client@aftrends.com` | client |

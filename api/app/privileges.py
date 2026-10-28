@@ -16,11 +16,13 @@ class Priv(StrEnum):
     PALETTE_WRITE = "palette.write"
     USERS_MANAGE = "users.manage"
     SETTINGS_MANAGE = "settings.manage"
+    NOTIFICATIONS_READ = "notifications.read"
+    NOTIFICATIONS_DELETE = "notifications.delete"
 
 
 STAFF_MATRIX_ROLES = (UserRole.support.value, UserRole.manager.value, UserRole.superadmin.value)
 
-ADMIN_ONLY = frozenset({Priv.USERS_MANAGE, Priv.SETTINGS_MANAGE})
+ADMIN_ONLY = frozenset({Priv.USERS_MANAGE, Priv.SETTINGS_MANAGE, Priv.NOTIFICATIONS_DELETE})
 
 CATALOG: tuple[dict[str, str], ...] = (
     {"id": Priv.STAFF_LOGIN, "label": "Sign in to staff console", "group": "Login"},
@@ -34,6 +36,8 @@ CATALOG: tuple[dict[str, str], ...] = (
     {"id": Priv.PALETTE_WRITE, "label": "Add palette colors", "group": "Catalog"},
     {"id": Priv.USERS_MANAGE, "label": "Manage people", "group": "Admin"},
     {"id": Priv.SETTINGS_MANAGE, "label": "Change store settings", "group": "Admin"},
+    {"id": Priv.NOTIFICATIONS_READ, "label": "View SMS notifications", "group": "Notifications"},
+    {"id": Priv.NOTIFICATIONS_DELETE, "label": "Delete read notifications", "group": "Notifications"},
 )
 
 SUPPORT: frozenset[Priv] = frozenset(
@@ -42,6 +46,7 @@ SUPPORT: frozenset[Priv] = frozenset(
         Priv.ORDERS_READ,
         Priv.ORDERS_UPDATE,
         Priv.CATALOG_READ,
+        Priv.NOTIFICATIONS_READ,
     }
 )
 

@@ -35,7 +35,7 @@ class RegisterRequest(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    email: str = Field(min_length=1, max_length=255)
     password: str = Field(min_length=1)
 
 
@@ -319,7 +319,7 @@ class CartOut(BaseModel):
 
 class CheckoutIn(BaseModel):
     address_id: UUID
-    delivery_zone_id: UUID
+    delivery_zone_id: UUID | None = None
     customer_note: str = ""
 
 
@@ -403,7 +403,7 @@ class OrderOut(BaseModel):
     currency: str
     customer: CustomerBrief
     delivery_address: DeliveryAddressOut
-    delivery_zone: ZoneOut
+    delivery_zone: ZoneOut | None = None
     items: list[OrderItemOut]
     notes: list[OrderNoteOut] = []
     events: list[OrderEventOut] = []
@@ -453,6 +453,8 @@ class SettingsOut(BaseModel):
     low_stock_threshold: int
     payment_account: str = "024 903 9110"
     payment_network: str = "MTN MoMo"
+    sms_admin_number: str = ""
+    test_mode: bool = False
 
 
 class SettingsPatch(BaseModel):
@@ -464,6 +466,8 @@ class SettingsPatch(BaseModel):
     low_stock_threshold: int | None = Field(default=None, ge=0)
     payment_account: str | None = Field(default=None, max_length=64)
     payment_network: str | None = Field(default=None, max_length=64)
+    sms_admin_number: str | None = Field(default=None, max_length=32)
+    test_mode: bool | None = None
 
 
 class StorefrontAssetOut(BaseModel):
@@ -490,3 +494,19 @@ class PrivilegeMatrixOut(BaseModel):
 
 class PrivilegeMatrixPatch(BaseModel):
     matrix: dict[str, dict[str, bool]]
+
+
+class NotificationOut(BaseModel):
+    id: UUID
+    kind: str
+    order_id: UUID | None = None
+    order_number: str = ""
+    title: str
+    customer_name: str = ""
+    body: str
+    recipients: str = ""
+    sender: str = ""
+    status: str
+    is_read: bool
+    created_at: datetime
+    read_at: datetime | None = None

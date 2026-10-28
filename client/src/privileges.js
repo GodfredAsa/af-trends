@@ -10,6 +10,8 @@ export const PRIV = {
   PALETTE_WRITE: 'palette.write',
   USERS_MANAGE: 'users.manage',
   SETTINGS_MANAGE: 'settings.manage',
+  NOTIFICATIONS_READ: 'notifications.read',
+  NOTIFICATIONS_DELETE: 'notifications.delete',
 }
 
 export const STAFF_ROLES = ['support', 'manager', 'superadmin']
@@ -26,9 +28,11 @@ export const PRIVILEGE_CATALOG = [
   { id: PRIV.PALETTE_WRITE, label: 'Add palette colors', group: 'Catalog' },
   { id: PRIV.USERS_MANAGE, label: 'Manage people', group: 'Admin' },
   { id: PRIV.SETTINGS_MANAGE, label: 'Change store settings', group: 'Admin' },
+  { id: PRIV.NOTIFICATIONS_READ, label: 'View SMS notifications', group: 'Notifications' },
+  { id: PRIV.NOTIFICATIONS_DELETE, label: 'Delete read notifications', group: 'Notifications' },
 ]
 
-const SUPPORT = [PRIV.STAFF_LOGIN, PRIV.ORDERS_READ, PRIV.ORDERS_UPDATE, PRIV.CATALOG_READ]
+const SUPPORT = [PRIV.STAFF_LOGIN, PRIV.ORDERS_READ, PRIV.ORDERS_UPDATE, PRIV.CATALOG_READ, PRIV.NOTIFICATIONS_READ]
 
 const MANAGER = [
   ...SUPPORT,

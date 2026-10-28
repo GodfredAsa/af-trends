@@ -165,6 +165,7 @@ export default function LandingPage() {
           </a>
         </div>
         <div className="cat-grid">
+          {!featured.length ? <p className="muted">No shirts in the shop yet.</p> : null}
           {featured.map((product) => (
             <Link className="cat-card" key={product.id} to={`/shirts/${product.slug}`}>
               <div className="photo">
@@ -237,6 +238,7 @@ export default function LandingPage() {
           <a href="#shop">View all best sellers</a>
         </div>
         <div className="best-grid">
+          {!bestsellers.length ? <p className="muted">No shirts in the shop yet.</p> : null}
           {bestsellers.map((product) => (
             <article className="best-card" key={product.id}>
               <Link className="photo" to={`/shirts/${product.slug}`}>
@@ -321,6 +323,7 @@ export default function LandingPage() {
         </div>
         {error ? <p className="error">{error}</p> : null}
         <div className="grid">
+          {!products.length && !error ? <p className="muted">No shirts in the shop yet.</p> : null}
           {products.map((product) => (
             <Link className="product-card shop-card" key={product.id} to={`/shirts/${product.slug}`}>
               <div className="photo">

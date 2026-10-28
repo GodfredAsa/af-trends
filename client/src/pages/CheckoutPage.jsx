@@ -6,9 +6,7 @@ export default function CheckoutPage({ session }) {
   const navigate = useNavigate()
   const [cart, setCart] = useState(null)
   const [addresses, setAddresses] = useState([])
-  const [zones, setZones] = useState([])
   const [addressId, setAddressId] = useState('')
-  const [zoneId, setZoneId] = useState('')
   const [note, setNote] = useState('')
   const [payAccount, setPayAccount] = useState('024 903 9110')
   const [payNetwork, setPayNetwork] = useState('MTN MoMo')
@@ -30,12 +28,6 @@ export default function CheckoutPage({ session }) {
         setAddresses(rows)
         const fallback = rows.find((row) => row.is_default) || rows[0]
         if (fallback) setAddressId(fallback.id)
-      })
-      .catch((err) => setError(err.message))
-    request('/delivery-zones')
-      .then((data) => {
-        setZones(data.items || [])
-        if (data.items?.[0]) setZoneId(data.items[0].id)
       })
       .catch((err) => setError(err.message))
     request('/storefront')
@@ -82,7 +74,6 @@ export default function CheckoutPage({ session }) {
         token: session.token,
         body: {
           address_id: addressId,
-          delivery_zone_id: zoneId,
           customer_note: note,
         },
       })
@@ -145,21 +136,13 @@ export default function CheckoutPage({ session }) {
         </button>
       </form>
 
-      <h2>Zone</h2>
       <form className="checkout-pay" onSubmit={placeOrder}>
-        <select value={zoneId} onChange={(e) => setZoneId(e.target.value)}>
-          {zones.map((row) => (
-            <option key={row.id} value={row.id}>
-              {row.name}
-            </option>
-          ))}
-        </select>
         <label>Note for the rider</label>
         <textarea value={note} onChange={(e) => setNote(e.target.value)} />
         <p>
           <strong>Total {money(total)}</strong>
         </p>
-        <button className="btn" type="submit" disabled={busy || !addressId || !zoneId}>
+        <button className="btn" type="submit" disabled={busy || !addressId}>
           {busy ? 'Submitting…' : 'Submit Order'}
         </button>
       </form>

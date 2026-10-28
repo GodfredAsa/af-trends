@@ -128,26 +128,57 @@ export default function StaffDashboard({ session }) {
   const navigate = useNavigate()
   const isAdmin = can(session.user, PRIV.USERS_MANAGE)
   const canCatalog = can(session.user, PRIV.CATALOG_READ)
+  const canSettings = can(session.user, PRIV.SETTINGS_MANAGE)
   const [orders, setOrders] = useState([])
   const [products, setProducts] = useState([])
   const [users, setUsers] = useState([])
   const [query, setQuery] = useState('')
+  const [testMode, setTestMode] = useState(false)
+  const [testBusy, setTestBusy] = useState(false)
+
+  function loadProducts() {
+    if (!canCatalog) return
+    request('/staff/products?page_size=50', { token: session.token })
+      .then((data) => setProducts(data.items || []))
+      .catch(() => {})
+  }
 
   useEffect(() => {
     request('/staff/orders?page_size=100', { token: session.token })
       .then((data) => setOrders(data.items || []))
       .catch(() => {})
-    if (canCatalog) {
-      request('/staff/products?page_size=50', { token: session.token })
-        .then((data) => setProducts(data.items || []))
-        .catch(() => {})
-    }
+    loadProducts()
     if (isAdmin) {
       request('/staff/users?page_size=100', { token: session.token })
         .then((data) => setUsers(data.items || []))
         .catch(() => {})
     }
-  }, [session.token, canCatalog, isAdmin])
+    if (canSettings) {
+      request('/staff/settings', { token: session.token })
+        .then((data) => setTestMode(Boolean(data.test_mode)))
+        .catch(() => {})
+    }
+  }, [session.token, canCatalog, isAdmin, canSettings])
+
+  async function toggleTestMode() {
+    if (testBusy || !canSettings) return
+    const next = !testMode
+    setTestBusy(true)
+    setTestMode(next)
+    try {
+      const saved = await request('/staff/settings', {
+        method: 'PATCH',
+        token: session.token,
+        body: { test_mode: next },
+      })
+      setTestMode(Boolean(saved.test_mode))
+      loadProducts()
+    } catch {
+      setTestMode(!next)
+    } finally {
+      setTestBusy(false)
+    }
+  }
 
   const recent = useMemo(() => {
     const term = query.trim().toLowerCase()
@@ -242,6 +273,25 @@ export default function StaffDashboard({ session }) {
           <LineSpark values={weekSeries} stroke="#ffffff" />
         </article>
       </section>
+      {canSettings ? (
+        <aside className="test-mode-float" aria-label="Test mode">
+          <div>
+            <p>Test mode</p>
+            <span>{testMode ? 'Sample shirts are visible' : 'Sample shirts are hidden'}</span>
+          </div>
+          <button
+            type="button"
+            className={`switch${testMode ? ' on' : ''}`}
+            role="switch"
+            aria-checked={testMode}
+            aria-label="Test mode"
+            disabled={testBusy}
+            onClick={toggleTestMode}
+          >
+            <span className="switch-knob" />
+          </button>
+        </aside>
+      ) : null}
 
       <section className="dash-mid">
         <article className="dash-card balance">
@@ -351,7 +401,7 @@ export default function StaffDashboard({ session }) {
           <article className="dash-card security">
             <IconFingerprint />
             <h2>Keep the store safe</h2>
-            <p>Review staff accounts, delivery zones, and the cash-on-delivery note.</p>
+            <p>Review staff accounts and the cash-on-delivery note.</p>
             <Link className="dash-btn" to="/staff/settings">
               Update settings
             </Link>

@@ -82,6 +82,25 @@ export function IconStar() {
   )
 }
 
+export function IconPhone(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true" {...props}>
+      <path d="M7 3.8h10A2.2 2.2 0 0 1 19.2 6v12A2.2 2.2 0 0 1 17 20.2H7A2.2 2.2 0 0 1 4.8 18V6A2.2 2.2 0 0 1 7 3.8z" />
+      <path d="M10 18.2h4" />
+    </svg>
+  )
+}
+
+export function IconImage(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true" {...props}>
+      <rect x="3.5" y="5" width="17" height="14" rx="2" />
+      <circle cx="9" cy="10" r="1.6" />
+      <path d="M6 17l4.2-4.2 3 3L16 13l4 4" />
+    </svg>
+  )
+}
+
 export function IconMail(props) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true" {...props}>
@@ -217,6 +236,15 @@ export function IconUpload(props) {
       <path d="M12 16V5" />
       <path d="M8 9l4-4 4 4" />
       <path d="M5 19h14" />
+    </svg>
+  )
+}
+
+export function IconEye(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true" {...props}>
+      <path d="M2.5 12s3.8-7 9.5-7 9.5 7 9.5 7-3.8 7-9.5 7-9.5-7-9.5-7z" />
+      <circle cx="12" cy="12" r="2.6" />
     </svg>
   )
 }

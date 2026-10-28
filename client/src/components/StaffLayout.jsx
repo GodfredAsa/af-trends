@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, Link, useLocation } from 'react-router-dom'
-import { IconBag, IconBoxes, IconChevron, IconCog, IconGrid, IconLogout, IconShield, IconShirt, IconUsers } from './Icons.jsx'
+import { IconBag, IconBell, IconBoxes, IconChevron, IconCog, IconGrid, IconLogout, IconShield, IconShirt, IconUsers } from './Icons.jsx'
 import Logo from './Logo.jsx'
 import { request } from '../api.js'
 import { PRIV, can } from '../privileges.js'
@@ -41,7 +41,9 @@ export default function StaffLayout({ session, onLogout }) {
   const canCatalog = can(session?.user, PRIV.CATALOG_READ)
   const canUsers = can(session?.user, PRIV.USERS_MANAGE)
   const canSettings = can(session?.user, PRIV.SETTINGS_MANAGE)
+  const canNotifications = can(session?.user, PRIV.NOTIFICATIONS_READ)
   const [pendingCount, setPendingCount] = useState(0)
+  const [unreadNotices, setUnreadNotices] = useState(0)
   const [collapsed, setCollapsed] = useState(() => {
     try {
       return localStorage.getItem(SIDEBAR_KEY) === '1'
@@ -63,7 +65,12 @@ export default function StaffLayout({ session, onLogout }) {
     request('/staff/orders?status=pending&page_size=1', { token: session.token })
       .then((data) => setPendingCount(Number(data.total) || 0))
       .catch(() => setPendingCount(0))
-  }, [session?.token, location.pathname])
+    if (canNotifications) {
+      request('/staff/notifications', { token: session.token })
+        .then((data) => setUnreadNotices(Number(data.unread) || 0))
+        .catch(() => setUnreadNotices(0))
+    }
+  }, [session?.token, location.pathname, canNotifications])
 
   return (
     <div className={collapsed ? 'staff collapsed' : 'staff'}>
@@ -89,6 +96,9 @@ export default function StaffLayout({ session, onLogout }) {
           {canCatalog ? <NavItem to="/staff/stock" icon={<IconBoxes />} label="Stock" /> : null}
           {canUsers ? <NavItem to="/staff/users" icon={<IconUsers />} label="Users" /> : null}
           <NavItem to="/staff/control" icon={<IconShield />} label="Control Center" />
+          {canNotifications ? (
+            <NavItem to="/staff/notifications" icon={<IconBell />} label="Notifications" badge={unreadNotices} />
+          ) : null}
         </nav>
         <div className="side-foot">
           {canSettings ? <NavItem to="/staff/settings" icon={<IconCog />} label="Settings" /> : null}

@@ -10,7 +10,7 @@ from app.deps import CatalogDeleter, CatalogEditor, CatalogReader, DbSession, Pa
 from app.media import MAX_FILES, destroy_upload, save_upload, slugify
 from app.models import CartItem, ColorPalette, OrderItem, Product, ProductColor, ProductImage, ProductSize, SIZES, Variant
 from app.schemas import ColorCreate, ColorOut, ColorPatch, ImagePatch, ProductCreate, ProductOut, ProductPatch, VariantStockPut
-from app.serializers import color_out, page, product_list_item, product_out
+from app.serializers import apply_demo_filter, color_out, page, product_list_item, product_out
 
 router = APIRouter()
 
@@ -54,7 +54,7 @@ def list_products(
     is_published: bool | None = None,
 ):
     page_num, page_size = pagination
-    stmt = _editor_query().order_by(Product.created_at.desc())
+    stmt = apply_demo_filter(_editor_query(), db).order_by(Product.created_at.desc())
     if q:
         stmt = stmt.where(or_(Product.name.ilike(f"%{q.strip()}%"), Product.slug.ilike(f"%{q.strip()}%")))
     if is_published is not None:

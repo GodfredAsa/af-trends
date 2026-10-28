@@ -42,16 +42,16 @@ export default function LoginPage({ onLogin }) {
       <form className="auth-card" onSubmit={submit}>
         <p className="eyebrow">Account</p>
         <h1>Sign in</h1>
-        <p className="muted">Use your customer or staff email.</p>
+        <p className="muted">Use your email, or staff phone number.</p>
         {error ? <p className="error">{error}</p> : null}
-        <label htmlFor="email">Email</label>
+        <label htmlFor="email">Email or phone</label>
         <input
           id="email"
-          type="email"
-          autoComplete="email"
+          type="text"
+          autoComplete="username"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@email.com"
+          placeholder="you@email.com or 0548670632"
           required
         />
         <label htmlFor="password">Password</label>

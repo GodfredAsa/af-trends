@@ -22,6 +22,7 @@ import StaffUsers from './pages/staff/StaffUsers.jsx'
 import StaffSettings from './pages/staff/StaffSettings.jsx'
 import StaffStock from './pages/staff/StaffStock.jsx'
 import StaffControlCenter from './pages/staff/StaffControlCenter.jsx'
+import StaffNotifications from './pages/staff/StaffNotifications.jsx'
 
 function ClientOnly({ session, children }) {
   if (!session) return <Navigate to="/login" replace />
@@ -157,6 +158,14 @@ export default function App() {
         <Route
           path="control"
           element={<StaffControlCenter session={session} onUser={handleUser} />}
+        />
+        <Route
+          path="notifications"
+          element={
+            <StaffOnly session={session} priv={PRIV.NOTIFICATIONS_READ}>
+              <StaffNotifications session={session} />
+            </StaffOnly>
+          }
         />
         <Route
           path="settings"

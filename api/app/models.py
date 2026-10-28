@@ -133,6 +133,8 @@ class StoreSettings(Base):
     privilege_matrix: Mapped[str] = mapped_column(Text, default="")
     payment_account: Mapped[str] = mapped_column(String(64), default="024 903 9110")
     payment_network: Mapped[str] = mapped_column(String(64), default="MTN MoMo")
+    sms_admin_number: Mapped[str] = mapped_column(String(32), default="")
+    test_mode: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class DeliveryZone(Base):
@@ -156,6 +158,7 @@ class Product(Base):
     discount_percent: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal("0.00"))
     is_published: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     is_new_arrival: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    is_demo: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
@@ -268,7 +271,7 @@ class Order(Base):
     currency: Mapped[str] = mapped_column(String(8), default="GHS")
     customer_note: Mapped[str] = mapped_column(Text, default="")
     delivery_zone_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("delivery_zones.id"), nullable=True)
-    zone_name: Mapped[str] = mapped_column(String(128))
+    zone_name: Mapped[str] = mapped_column(String(128), default="")
     address_label: Mapped[str] = mapped_column(String(64))
     address_line1: Mapped[str] = mapped_column(String(255))
     address_line2: Mapped[str] = mapped_column(String(255), default="")
@@ -383,3 +386,24 @@ class StorefrontAsset(Base):
     url: Mapped[str] = mapped_column(String(512), default="")
     public_id: Mapped[str] = mapped_column(String(255), default="")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+    __table_args__ = (UniqueConstraint("idempotency_key", name="uq_notifications_idempotency_key"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=new_uuid)
+    kind: Mapped[str] = mapped_column(String(32), default="sms", index=True)
+    idempotency_key: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    order_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("orders.id"), nullable=True, index=True)
+    order_number: Mapped[str] = mapped_column(String(32), default="")
+    title: Mapped[str] = mapped_column(String(255), default="")
+    customer_name: Mapped[str] = mapped_column(String(255), default="")
+    body: Mapped[str] = mapped_column(Text, default="")
+    recipients: Mapped[str] = mapped_column(String(255), default="")
+    sender: Mapped[str] = mapped_column(String(64), default="")
+    status: Mapped[str] = mapped_column(String(32), default="queued", index=True)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    provider_response: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

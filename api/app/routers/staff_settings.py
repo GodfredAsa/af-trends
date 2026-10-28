@@ -8,7 +8,9 @@ from app.media import destroy_upload, save_upload
 from app.models import DeliveryZone, StorefrontAsset
 from app.money import money_str
 from app.schemas import SettingsOut, SettingsPatch, StorefrontAssetOut, ZoneCreate, ZoneOut, ZonePatch
+from app.seed import enable_demo_catalog
 from app.serializers import get_settings
+from app.sms import local_msisdn
 from app.storefront import STOREFRONT_SLOTS, slot_map
 
 router = APIRouter()
@@ -24,6 +26,8 @@ def _settings_out(row) -> SettingsOut:
         low_stock_threshold=row.low_stock_threshold,
         payment_account=getattr(row, "payment_account", None) or "024 903 9110",
         payment_network=getattr(row, "payment_network", None) or "MTN MoMo",
+        sms_admin_number=getattr(row, "sms_admin_number", None) or "",
+        test_mode=bool(getattr(row, "test_mode", False)),
     )
 
 
@@ -47,11 +51,16 @@ def read_settings(_admin: SettingsAdmin, db: DbSession) -> SettingsOut:
 def patch_settings(payload: SettingsPatch, _admin: SettingsAdmin, db: DbSession) -> SettingsOut:
     row = get_settings(db)
     data = payload.model_dump(exclude_unset=True)
+    if "sms_admin_number" in data and data["sms_admin_number"] is not None:
+        data["sms_admin_number"] = local_msisdn(data["sms_admin_number"])
     for key, value in data.items():
         setattr(row, key, value)
     db.add(row)
     db.commit()
     db.refresh(row)
+    if row.test_mode:
+        enable_demo_catalog(db)
+        db.refresh(row)
     return _settings_out(row)
 
 

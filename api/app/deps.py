@@ -53,6 +53,8 @@ OrderCollector = Annotated[User, Depends(require_priv(Priv.ORDERS_COLLECT))]
 OrderDeleter = Annotated[User, Depends(require_priv(Priv.ORDERS_DELETE))]
 SuperadminUser = Annotated[User, Depends(require_priv(Priv.USERS_MANAGE))]
 SettingsAdmin = Annotated[User, Depends(require_priv(Priv.SETTINGS_MANAGE))]
+NotificationReader = Annotated[User, Depends(require_priv(Priv.NOTIFICATIONS_READ))]
+NotificationAdmin = Annotated[User, Depends(require_priv(Priv.NOTIFICATIONS_DELETE))]
 ManagerPlus = OrderCollector
 
 

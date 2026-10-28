@@ -53,7 +53,6 @@ export default function OrderModal({ order, onClose, manageHref }) {
         {order.delivery_address ? (
           <p className="muted modal-meta">
             {order.delivery_address.line1}, {order.delivery_address.city}
-            {order.delivery_zone?.name ? ` · ${order.delivery_zone.name}` : ''}
           </p>
         ) : null}
 

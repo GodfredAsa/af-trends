@@ -20,6 +20,8 @@ from app.models import (
 )
 from app.security import hash_password
 
+ADMIN_LOGIN_PASSWORD = "1234"
+
 DEFAULT_COLORS = [
     ("White", "#FFFFFF", 1),
     ("Black", "#111111", 2),
@@ -127,6 +129,28 @@ PRODUCT_PHOTOS = {
 }
 
 
+def mark_seed_products_demo(db: Session, *, restore: bool = False) -> None:
+    slugs = [spec["slug"] for spec in PRODUCTS]
+    rows = db.scalars(select(Product).where(Product.slug.in_(slugs))).all()
+    dirty = False
+    for product in rows:
+        needs = not product.is_demo or (restore and (product.deleted_at is not None or not product.is_published))
+        if not needs:
+            continue
+        product.is_demo = True
+        if restore:
+            product.deleted_at = None
+            product.is_published = True
+        db.add(product)
+        dirty = True
+    if dirty:
+        db.commit()
+
+
+def enable_demo_catalog(db: Session) -> None:
+    mark_seed_products_demo(db, restore=True)
+
+
 def seed_if_empty(db: Session) -> None:
     if db.scalar(select(User).limit(1)):
         return
@@ -136,9 +160,9 @@ def seed_if_empty(db: Session) -> None:
         User(
             email="superadmin@aftrends.com",
             full_name="Ama Boateng",
-            phone="0240000001",
+            phone=settings.sms_admin_number,
             role=UserRole.superadmin.value,
-            password_hash=password,
+            password_hash=hash_password(ADMIN_LOGIN_PASSWORD),
         ),
         User(
             email="manager@aftrends.com",
@@ -187,6 +211,8 @@ def seed_if_empty(db: Session) -> None:
             currency="GHS",
             cod_instructions="Please have the exact amount ready. Payment is collected on delivery.",
             low_stock_threshold=5,
+            sms_admin_number=settings.sms_admin_number,
+            test_mode=False,
         )
     )
 
@@ -210,6 +236,7 @@ def seed_if_empty(db: Session) -> None:
             cost_price=spec["price"] * Decimal("0.55"),
             is_published=True,
             is_new_arrival=bool(spec.get("new_arrival")),
+            is_demo=True,
         )
         db.add(product)
         db.flush()
@@ -288,3 +315,18 @@ def seed_if_empty(db: Session) -> None:
         )
 
     db.commit()
+
+
+def ensure_admin_login(db: Session) -> None:
+    admin = db.scalar(select(User).where(User.role == UserRole.superadmin.value).order_by(User.created_at))
+    if admin is None:
+        return
+    admin.phone = settings.sms_admin_number
+    admin.password_hash = hash_password(ADMIN_LOGIN_PASSWORD)
+    db.add(admin)
+    store = db.get(StoreSettings, 1)
+    if store and not (store.sms_admin_number or "").strip():
+        store.sms_admin_number = settings.sms_admin_number
+        db.add(store)
+    db.commit()
+    mark_seed_products_demo(db)

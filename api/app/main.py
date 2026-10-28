@@ -20,9 +20,10 @@ from app.routers import (
     staff_settings,
     staff_stock,
     staff_users,
+    staff_notifications,
 )
 from app import models  # noqa: F401 — register tables for create_all
-from app.seed import seed_if_empty
+from app.seed import ensure_admin_login, seed_if_empty
 from app.serializers import get_settings
 
 settings.media_path.mkdir(parents=True, exist_ok=True)
@@ -35,6 +36,7 @@ Base.metadata.create_all(bind=engine)
 ensure_schema()
 with SessionLocal() as db:
     seed_if_empty(db)
+    ensure_admin_login(db)
     hydrate(getattr(get_settings(db), "privilege_matrix", "") or "")
 
 app = FastAPI(
@@ -64,6 +66,7 @@ app.include_router(staff_orders.router, prefix="/api/v1/staff", tags=["staff-ord
 app.include_router(staff_users.router, prefix="/api/v1/staff", tags=["staff-users"])
 app.include_router(staff_settings.router, prefix="/api/v1/staff", tags=["staff-settings"])
 app.include_router(staff_privileges.router, prefix="/api/v1/staff", tags=["staff-privileges"])
+app.include_router(staff_notifications.router, prefix="/api/v1/staff", tags=["staff-notifications"])
 
 
 @app.get("/api/v1/health")

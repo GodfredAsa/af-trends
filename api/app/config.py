@@ -17,13 +17,19 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 720
     database_url: str = "sqlite:///./af_trends.db"
-    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174"
+    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:5175,http://127.0.0.1:5175"
     media_dir: str = "media"
     seed_password: str = "trends123"
     cloudinary_cloud_name: str = ""
     cloudinary_api_key: str = ""
     cloudinary_api_secret: str = ""
     client_dist: str = ""
+    vynfy_api_url: str = "https://sms.vynfy.com/api/v1/send"
+    vynfy_api_key: str = ""
+    sms_sender: str = "AF_TRENDZ"
+    sms_admin_number: str = "0548670632"
+    sms_campaign_id: str = "spring_promo_2024"
+    sms_customer_segment: str = "premium"
 
     @property
     def allowed_origins(self) -> list[str]:

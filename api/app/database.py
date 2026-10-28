@@ -44,6 +44,20 @@ def ensure_schema() -> None:
                         """
                     )
                 )
+        if "is_demo" not in columns:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE products ADD COLUMN is_demo BOOLEAN DEFAULT 0 NOT NULL"))
+                conn.execute(
+                    text(
+                        """
+                        UPDATE products SET is_demo = 1
+                        WHERE slug IN (
+                            'kente-crest-tee','adinkra-wisdom-tee','accra-nights-tee',
+                            'sahara-line-tee','coastline-script-tee','market-square-tee'
+                        )
+                        """
+                    )
+                )
     if "product_images" in tables:
         image_columns = {column["name"] for column in inspector.get_columns("product_images")}
         if "public_id" not in image_columns:
@@ -60,6 +74,17 @@ def ensure_schema() -> None:
         if "payment_network" not in setting_columns:
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE store_settings ADD COLUMN payment_network VARCHAR(64) DEFAULT 'MTN MoMo' NOT NULL"))
+        if "sms_admin_number" not in setting_columns:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE store_settings ADD COLUMN sms_admin_number VARCHAR(32) DEFAULT '' NOT NULL"))
+        if "test_mode" not in setting_columns:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE store_settings ADD COLUMN test_mode BOOLEAN DEFAULT 0 NOT NULL"))
+    if "notifications" in tables:
+        notice_columns = {column["name"] for column in inspector.get_columns("notifications")}
+        if "customer_name" not in notice_columns:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE notifications ADD COLUMN customer_name VARCHAR(255) DEFAULT '' NOT NULL"))
     if "orders" in tables:
         order_columns = {column["name"] for column in inspector.get_columns("orders")}
         if "stock_held" not in order_columns:

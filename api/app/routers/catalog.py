@@ -6,7 +6,7 @@ from app.cart_hold import release_expired_carts
 from app.deps import DbSession, Pagination
 from app.models import ColorPalette, Product, ProductColor, ProductSize, SIZES, StorefrontAsset, Variant
 from app.schemas import ProductOut, SizeListOut
-from app.serializers import color_out, get_settings, page, product_list_item, product_out
+from app.serializers import apply_demo_filter, color_out, get_settings, page, product_list_item, product_out
 from app.storefront import STOREFRONT_SLOTS
 
 router = APIRouter()
@@ -37,7 +37,7 @@ def list_products(
 ):
     release_expired_carts(db)
     page_num, page_size = pagination
-    stmt = _published_query()
+    stmt = apply_demo_filter(_published_query(), db)
     if q:
         stmt = stmt.where(Product.name.ilike(f"%{q.strip()}%"))
     if color_id:
@@ -65,7 +65,7 @@ def list_products(
 @router.get("/catalog/products/{slug}", response_model=ProductOut)
 def get_product(slug: str, db: DbSession) -> ProductOut:
     release_expired_carts(db)
-    product = db.scalar(_published_query().where(Product.slug == slug))
+    product = db.scalar(apply_demo_filter(_published_query(), db).where(Product.slug == slug))
     if product is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shirt not found.")
     return product_out(product, db)
