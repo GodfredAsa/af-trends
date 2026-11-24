@@ -1,14 +1,14 @@
 from uuid import UUID
 
 from fastapi import APIRouter, File, HTTPException, UploadFile, status
-from sqlalchemy import select
+from sqlalchemy import select, text
 
-from app.deps import DbSession, SettingsAdmin
+from app.deps import DbSession, SettingsAdmin, SuperadminUser
 from app.media import destroy_upload, save_upload
-from app.models import DeliveryZone, StorefrontAsset
+from app.models import DeliveryZone, StorefrontAsset, UserRole
 from app.money import money_str
 from app.schemas import SettingsOut, SettingsPatch, StorefrontAssetOut, ZoneCreate, ZoneOut, ZonePatch
-from app.seed import enable_demo_catalog
+from app.seed import enable_demo_catalog, generate_sample_data
 from app.serializers import get_settings
 from app.sms import local_msisdn
 from app.storefront import STOREFRONT_SLOTS, slot_map
@@ -27,6 +27,9 @@ def _settings_out(row) -> SettingsOut:
         payment_account=getattr(row, "payment_account", None) or "024 903 9110",
         payment_network=getattr(row, "payment_network", None) or "MTN MoMo",
         sms_admin_number=getattr(row, "sms_admin_number", None) or "",
+        sms_sender=getattr(row, "sms_sender", None) or "",
+        vynfy_api_url=getattr(row, "vynfy_api_url", None) or "",
+        vynfy_api_key_set=bool((getattr(row, "vynfy_api_key", None) or "").strip()),
         test_mode=bool(getattr(row, "test_mode", False)),
     )
 
@@ -51,10 +54,17 @@ def read_settings(_admin: SettingsAdmin, db: DbSession) -> SettingsOut:
 def patch_settings(payload: SettingsPatch, _admin: SettingsAdmin, db: DbSession) -> SettingsOut:
     row = get_settings(db)
     data = payload.model_dump(exclude_unset=True)
+    api_key = data.pop("vynfy_api_key", None)
     if "sms_admin_number" in data and data["sms_admin_number"] is not None:
         data["sms_admin_number"] = local_msisdn(data["sms_admin_number"])
+    if "sms_sender" in data and data["sms_sender"] is not None:
+        data["sms_sender"] = data["sms_sender"].strip()
+    if "vynfy_api_url" in data and data["vynfy_api_url"] is not None:
+        data["vynfy_api_url"] = data["vynfy_api_url"].strip()
     for key, value in data.items():
         setattr(row, key, value)
+    if api_key is not None and str(api_key).strip():
+        row.vynfy_api_key = str(api_key).strip()
     db.add(row)
     db.commit()
     db.refresh(row)
@@ -62,6 +72,47 @@ def patch_settings(payload: SettingsPatch, _admin: SettingsAdmin, db: DbSession)
         enable_demo_catalog(db)
         db.refresh(row)
     return _settings_out(row)
+
+
+CLEAR_TABLES = (
+    "payment_proof_images",
+    "payment_proofs",
+    "order_notes",
+    "order_events",
+    "order_items",
+    "notifications",
+    "orders",
+    "cart_items",
+    "product_images",
+    "product_colors",
+    "product_sizes",
+    "variants",
+    "products",
+    "storefront_assets",
+    "delivery_zones",
+    "addresses",
+    "color_palette",
+)
+
+
+@router.post("/settings/clear-data")
+def clear_operational_data(admin: SuperadminUser, db: DbSession):
+    if admin.role != UserRole.superadmin.value:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only a superadmin can clear store data.")
+    db.execute(text("PRAGMA foreign_keys = OFF"))
+    for table in CLEAR_TABLES:
+        db.execute(text(f"DELETE FROM {table}"))
+    db.execute(text("PRAGMA foreign_keys = ON"))
+    db.commit()
+    return {"cleared": True, "kept": ["users", "store_settings"]}
+
+
+@router.post("/settings/sample-data")
+def create_sample_data(admin: SuperadminUser, db: DbSession):
+    if admin.role != UserRole.superadmin.value:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only a superadmin can generate sample data.")
+    summary = generate_sample_data(db)
+    return {"generated": True, **summary}
 
 
 @router.get("/delivery-zones")

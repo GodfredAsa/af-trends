@@ -454,6 +454,9 @@ class SettingsOut(BaseModel):
     payment_account: str = "024 903 9110"
     payment_network: str = "MTN MoMo"
     sms_admin_number: str = ""
+    sms_sender: str = ""
+    vynfy_api_url: str = ""
+    vynfy_api_key_set: bool = False
     test_mode: bool = False
 
 
@@ -467,6 +470,9 @@ class SettingsPatch(BaseModel):
     payment_account: str | None = Field(default=None, max_length=64)
     payment_network: str | None = Field(default=None, max_length=64)
     sms_admin_number: str | None = Field(default=None, max_length=32)
+    sms_sender: str | None = Field(default=None, max_length=64)
+    vynfy_api_url: str | None = Field(default=None, max_length=255)
+    vynfy_api_key: str | None = Field(default=None, max_length=255)
     test_mode: bool | None = None
 
 

@@ -80,6 +80,15 @@ def ensure_schema() -> None:
         if "test_mode" not in setting_columns:
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE store_settings ADD COLUMN test_mode BOOLEAN DEFAULT 0 NOT NULL"))
+        if "sms_sender" not in setting_columns:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE store_settings ADD COLUMN sms_sender VARCHAR(64) DEFAULT '' NOT NULL"))
+        if "vynfy_api_key" not in setting_columns:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE store_settings ADD COLUMN vynfy_api_key VARCHAR(255) DEFAULT '' NOT NULL"))
+        if "vynfy_api_url" not in setting_columns:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE store_settings ADD COLUMN vynfy_api_url VARCHAR(255) DEFAULT '' NOT NULL"))
     if "notifications" in tables:
         notice_columns = {column["name"] for column in inspector.get_columns("notifications")}
         if "customer_name" not in notice_columns:

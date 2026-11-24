@@ -134,6 +134,9 @@ class StoreSettings(Base):
     payment_account: Mapped[str] = mapped_column(String(64), default="024 903 9110")
     payment_network: Mapped[str] = mapped_column(String(64), default="MTN MoMo")
     sms_admin_number: Mapped[str] = mapped_column(String(32), default="")
+    sms_sender: Mapped[str] = mapped_column(String(64), default="")
+    vynfy_api_key: Mapped[str] = mapped_column(String(255), default="")
+    vynfy_api_url: Mapped[str] = mapped_column(String(255), default="")
     test_mode: Mapped[bool] = mapped_column(Boolean, default=False)
 
 

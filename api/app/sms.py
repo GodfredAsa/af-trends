@@ -97,10 +97,19 @@ def local_msisdn(number: str) -> str:
     return digits
 
 
-def admin_sms_number(db) -> str:
+def sms_config(db) -> dict[str, str]:
     row = db.get(StoreSettings, 1) if db is not None else None
-    raw = (row.sms_admin_number if row else "") or settings.sms_admin_number
-    return local_msisdn(raw)
+    api_key = ((getattr(row, "vynfy_api_key", None) if row else "") or settings.vynfy_api_key or "").strip()
+    sender = ((getattr(row, "sms_sender", None) if row else "") or settings.sms_sender or "").strip()
+    api_url = (
+        (getattr(row, "vynfy_api_url", None) if row else "") or settings.vynfy_api_url or "https://sms.vynfy.com/api/v1/send"
+    ).strip()
+    admin_number = local_msisdn((row.sms_admin_number if row else "") or settings.sms_admin_number)
+    return {"api_key": api_key, "sender": sender, "api_url": api_url, "admin_number": admin_number}
+
+
+def admin_sms_number(db) -> str:
+    return sms_config(db)["admin_number"]
 
 
 def _recipients(admin_number: str, customer_phone: str | None) -> list[str]:
@@ -175,7 +184,9 @@ def send_order_sms(payload: dict) -> None:
     key = payload.get("idempotency_key") or f"sms:order:{payload.get('order_number')}"
     db = SessionLocal()
     try:
-        payload["recipients"] = _recipients(admin_sms_number(db), payload.get("customer_phone"))
+        cfg = sms_config(db)
+        payload["recipients"] = _recipients(cfg["admin_number"], payload.get("customer_phone"))
+        payload["sender"] = cfg["sender"] or settings.sms_sender
         existing = db.scalar(select(Notification).where(Notification.idempotency_key == key))
         if existing and existing.status == "sent":
             _console_sms("SKIPPED (already sent)", payload)
@@ -211,8 +222,8 @@ def send_order_sms(payload: dict) -> None:
             _console_sms("SKIPPED (already sent)", payload)
             return
 
-        api_key = (settings.vynfy_api_key or "").strip()
-        api_url = (settings.vynfy_api_url or "https://sms.vynfy.com/api/v1/send").strip()
+        api_key = cfg["api_key"]
+        api_url = cfg["api_url"] or "https://sms.vynfy.com/api/v1/send"
         if not api_key:
             existing.status = "failed"
             existing.provider_response = "Missing VYNFY_API_KEY."

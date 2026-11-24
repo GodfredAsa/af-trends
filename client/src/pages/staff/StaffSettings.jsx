@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { request } from '../../api.js'
 import {
+  IconBoxes,
+  IconChat,
   IconCog,
   IconHeadset,
   IconImage,
@@ -8,6 +10,7 @@ import {
   IconMail,
   IconPhone,
   IconShirt,
+  IconTrash,
   IconTruck,
 } from '../../components/Icons.jsx'
 
@@ -32,6 +35,7 @@ const TABS = [
   { id: 'store', label: 'Store', icon: <IconCog /> },
   { id: 'photos', label: 'Photos', icon: <IconImage /> },
   { id: 'colours', label: 'Colours', icon: <IconShirt /> },
+  { id: 'data', label: 'Data', icon: <IconBoxes /> },
 ]
 
 export default function StaffSettings({ session }) {
@@ -41,8 +45,10 @@ export default function StaffSettings({ session }) {
   const [drafts, setDrafts] = useState({})
   const [color, setColor] = useState({ name: '', hex: '#2A3B30' })
   const [assets, setAssets] = useState([])
+  const [apiKeyDraft, setApiKeyDraft] = useState('')
   const [error, setError] = useState('')
   const [busyId, setBusyId] = useState('')
+  const isSuperadmin = session.user?.role === 'superadmin'
   const assetInput = useRef(null)
   const pendingAsset = useRef('')
 
@@ -65,14 +71,63 @@ export default function StaffSettings({ session }) {
   async function saveSettings(event) {
     event.preventDefault()
     try {
+      const body = { ...settings }
+      delete body.vynfy_api_key_set
+      delete body.vynfy_api_key
+      if (apiKeyDraft.trim()) body.vynfy_api_key = apiKeyDraft.trim()
       const next = await request('/staff/settings', {
         method: 'PATCH',
         token: session.token,
-        body: settings,
+        body,
       })
       setSettings(next)
+      setApiKeyDraft('')
     } catch (err) {
       setError(err.message)
+    }
+  }
+
+  async function clearStoreData() {
+    if (
+      !window.confirm(
+        'This deletes orders, shirts, stock, carts, notifications, and addresses. User accounts and store settings stay. Continue?',
+      )
+    ) {
+      return
+    }
+    if (!window.confirm('This cannot be undone. Clear all store data now?')) return
+    setError('')
+    setBusyId('clear')
+    try {
+      await request('/staff/settings/clear-data', { method: 'POST', token: session.token })
+      load()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusyId('')
+    }
+  }
+
+  async function generateSampleData() {
+    if (
+      !window.confirm(
+        'Create sample shirts, orders, addresses, and notifications? Existing users and settings stay. Continue?',
+      )
+    ) {
+      return
+    }
+    setError('')
+    setBusyId('sample')
+    try {
+      const result = await request('/staff/settings/sample-data', { method: 'POST', token: session.token })
+      load()
+      window.alert(
+        `Sample data added: ${result.products || 0} shirts, ${result.orders || 0} orders, ${result.notifications || 0} notifications.`,
+      )
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusyId('')
     }
   }
 
@@ -162,7 +217,7 @@ export default function StaffSettings({ session }) {
       <header className="dash-head">
         <div>
           <h1>Settings</h1>
-          <p>Store copy, homepage photos, and the shirt colour palette.</p>
+          <p>Store copy, homepage photos, colours, and sample data tools.</p>
         </div>
       </header>
       {error ? <p className="error">{error}</p> : null}
@@ -223,6 +278,25 @@ export default function StaffSettings({ session }) {
             />
           </Field>
           <p className="muted qty-hint">Order SMS is sent to this number and to the buyer.</p>
+          <Field icon={<IconChat />} label="SMS sender ID">
+            <input
+              value={settings.sms_sender || ''}
+              onChange={(e) => setSettings({ ...settings, sms_sender: e.target.value })}
+              placeholder="AF_TRENDZ"
+            />
+          </Field>
+          <Field icon={<IconLock />} label="Vynfy API key">
+            <input
+              type="password"
+              autoComplete="off"
+              value={apiKeyDraft}
+              onChange={(e) => setApiKeyDraft(e.target.value)}
+              placeholder={settings.vynfy_api_key_set ? 'Key is saved. Enter a new key to replace it.' : 'Paste Vynfy API key'}
+            />
+          </Field>
+          <p className="muted qty-hint">
+            {settings.vynfy_api_key_set ? 'A Vynfy API key is stored. Leave the field blank to keep it.' : 'No Vynfy API key stored yet.'}
+          </p>
           <Field icon={<IconTruck />} label="Cash on delivery note">
             <textarea
               value={settings.cod_instructions}
@@ -330,6 +404,40 @@ export default function StaffSettings({ session }) {
               {busyId === 'new' ? 'Adding…' : 'Add colour'}
             </button>
           </form>
+        </section>
+      ) : null}
+
+      {tab === 'data' ? (
+        <section className="edit-card data-tools">
+          <h2>Store data</h2>
+          <p className="muted qty-hint">
+            Generate fills the shop with sample shirts, orders, and notifications. Clear removes operational data.
+            User accounts and store settings stay.
+          </p>
+          {isSuperadmin ? (
+            <div className="danger-zone-actions">
+              <button
+                type="button"
+                className="btn sample"
+                disabled={busyId === 'sample' || busyId === 'clear'}
+                onClick={generateSampleData}
+              >
+                <IconBoxes />
+                {busyId === 'sample' ? 'Generating…' : 'Generate random data'}
+              </button>
+              <button
+                type="button"
+                className="btn danger"
+                disabled={busyId === 'clear' || busyId === 'sample'}
+                onClick={clearStoreData}
+              >
+                <IconTrash />
+                {busyId === 'clear' ? 'Clearing…' : 'Clear all data'}
+              </button>
+            </div>
+          ) : (
+            <p className="muted qty-hint">Only a superadmin can generate or clear store data.</p>
+          )}
         </section>
       ) : null}
     </div>

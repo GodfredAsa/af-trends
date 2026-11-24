@@ -287,6 +287,60 @@ button:disabled {
   border-color: #ffffff;
 }
 
+.btn.danger {
+  background: #8b1e1e;
+  color: #ffffff;
+  border: 0;
+}
+
+.btn.danger:hover:not(:disabled) {
+  background: #6e1616;
+}
+
+.staff .btn.danger {
+  background: #8b1e1e;
+  color: #ffffff;
+}
+
+.staff .btn.danger:hover:not(:disabled) {
+  background: #6e1616;
+}
+
+.danger-zone {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid #ead5d5;
+}
+
+.danger-zone h2 {
+  margin: 0 0 8px;
+  color: #8b1e1e;
+}
+
+.danger-zone-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.danger-zone .btn {
+  margin-top: 0;
+}
+
+.staff .btn.sample {
+  background: #191919;
+  color: #ffffff;
+}
+
+.staff .btn.sample:hover:not(:disabled) {
+  background: #2a2a2a;
+}
+
+.settings-page .data-tools h2 {
+  margin-top: 0;
+}
+
 .btn.dark {
   background: #000000;
   color: #ffffff;

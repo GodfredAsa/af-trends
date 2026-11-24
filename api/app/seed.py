@@ -1,6 +1,9 @@
+from datetime import timedelta
 from decimal import Decimal
+from random import choice, randint, sample
+from uuid import uuid4
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.config import settings
@@ -9,14 +12,23 @@ from app.models import (
     Address,
     ColorPalette,
     DeliveryZone,
+    Notification,
+    Order,
+    OrderEvent,
+    OrderItem,
+    OrderStatus,
+    PaymentMethod,
+    PaymentStatus,
     Product,
     ProductColor,
     ProductImage,
     ProductSize,
+    STOCK_RESERVED_STATUSES,
     StoreSettings,
     User,
     UserRole,
     Variant,
+    utcnow,
 )
 from app.security import hash_password
 
@@ -151,6 +163,352 @@ def enable_demo_catalog(db: Session) -> None:
     mark_seed_products_demo(db, restore=True)
 
 
+def _ensure_palette(db: Session) -> dict[str, ColorPalette]:
+    existing = {color.name: color for color in db.scalars(select(ColorPalette)).all()}
+    for name, hex_value, order in DEFAULT_COLORS:
+        if name in existing:
+            continue
+        color = ColorPalette(name=name, hex=hex_value, sort_order=order)
+        db.add(color)
+        existing[name] = color
+    db.flush()
+    return existing
+
+
+def _ensure_zones(db: Session) -> list[DeliveryZone]:
+    rows = list(db.scalars(select(DeliveryZone)).all())
+    have = {zone.name for zone in rows}
+    for name, fee in ZONES:
+        if name in have:
+            continue
+        zone = DeliveryZone(name=name, fee=fee, is_active=True)
+        db.add(zone)
+        rows.append(zone)
+    db.flush()
+    return rows
+
+
+def _create_product_from_spec(db: Session, spec: dict, by_name: dict[str, ColorPalette], *, is_demo: bool) -> Product:
+    product = Product(
+        name=spec["name"],
+        slug=spec["slug"],
+        description=spec["description"],
+        base_price=spec["price"],
+        cost_price=spec["price"] * Decimal("0.55"),
+        is_published=True,
+        is_new_arrival=bool(spec.get("new_arrival")),
+        is_demo=is_demo,
+    )
+    db.add(product)
+    db.flush()
+
+    chosen = [by_name[name] for name in spec["colors"] if name in by_name]
+    for color in chosen:
+        db.add(ProductColor(product_id=product.id, color_id=color.id))
+    for size in spec["sizes"]:
+        db.add(ProductSize(product_id=product.id, size=size))
+    db.flush()
+
+    for color in chosen:
+        for size in spec["sizes"]:
+            prefix = "".join(part[0] for part in spec["slug"].split("-") if part)[:3].upper()
+            sku = f"{prefix}-{color.name[:3].upper()}-{size}-{uuid4().hex[:4].upper()}"
+            db.add(
+                Variant(
+                    product_id=product.id,
+                    color_id=color.id,
+                    size=size,
+                    sku=sku[:64],
+                    stock=spec.get("stock", 10),
+                )
+            )
+
+    attached = 0
+    for index, filename in enumerate(PRODUCT_PHOTOS.get(spec["slug"], [])):
+        catalog_file = settings.media_path / "catalog" / filename
+        if not catalog_file.exists():
+            continue
+        db.add(
+            ProductImage(
+                product_id=product.id,
+                url=f"/media/catalog/{filename}",
+                alt_text=product.name,
+                sort_order=index,
+                is_primary=index == 0,
+                color_id=None,
+            )
+        )
+        attached += 1
+    if attached:
+        return product
+
+    marks = spec.get("marks") or [("AF", "TRENDS")]
+    for index, color in enumerate(chosen):
+        mark = marks[0] if index == 0 else marks[min(1, len(marks) - 1)]
+        url = write_bytes(
+            product.id,
+            f"{color.name.lower().replace(' ', '-')}.svg",
+            _shirt_svg(color.hex, mark[0], mark[1]),
+        )
+        db.add(
+            ProductImage(
+                product_id=product.id,
+                url=url,
+                alt_text=f"{product.name} in {color.name}",
+                sort_order=index,
+                is_primary=index == 0,
+                color_id=color.id,
+            )
+        )
+    extra = write_bytes(product.id, "flat-lay.svg", _shirt_svg("#2A2D31", marks[0][0], "FLAT LAY"))
+    db.add(
+        ProductImage(
+            product_id=product.id,
+            url=extra,
+            alt_text=f"{product.name} flat lay",
+            sort_order=len(chosen),
+            is_primary=False,
+            color_id=None,
+        )
+    )
+    return product
+
+
+EXTRA_PRODUCTS = [
+    {
+        "name": "Volta Mist Tee",
+        "slug": "volta-mist-tee",
+        "description": "River-road mist print on midweight cotton.",
+        "price": Decimal("105.00"),
+        "colors": ["Olive", "White", "Navy"],
+        "sizes": ["S", "M", "L", "XL"],
+        "stock": 13,
+        "new_arrival": True,
+        "marks": [("VOLTA", "MIST")],
+    },
+    {
+        "name": "Cape Coast Line Tee",
+        "slug": "cape-coast-line-tee",
+        "description": "Harbour type, salt-air cotton, open neck.",
+        "price": Decimal("115.00"),
+        "colors": ["Navy", "White", "Black"],
+        "sizes": ["S", "M", "L", "XL"],
+        "stock": 9,
+        "marks": [("CAPE", "COAST")],
+    },
+    {
+        "name": "Tamale Dust Tee",
+        "slug": "tamale-dust-tee",
+        "description": "Dry-season pigment and a quiet chest mark.",
+        "price": Decimal("98.00"),
+        "colors": ["Red", "Black", "Dark Gray"],
+        "sizes": ["M", "L", "XL", "XXL"],
+        "stock": 11,
+        "marks": [("TAMALE", "DUST")],
+    },
+    {
+        "name": "Labadi Tide Tee",
+        "slug": "labadi-tide-tee",
+        "description": "Weekend lettering for the Accra shoreline.",
+        "price": Decimal("125.00"),
+        "colors": ["White", "Navy", "Olive"],
+        "sizes": ["S", "M", "L", "XL"],
+        "stock": 10,
+        "new_arrival": True,
+        "marks": [("LABADI", "TIDE")],
+    },
+]
+
+
+def _next_sample_order_prefix(db: Session) -> tuple[str, int]:
+    today = utcnow().strftime("%Y%m%d")
+    prefix = f"AFT-{today}-"
+    count = db.scalar(select(func.count()).select_from(Order).where(Order.order_number.like(f"{prefix}%"))) or 0
+    return prefix, int(count)
+
+
+def generate_sample_data(db: Session) -> dict[str, int]:
+    by_name = _ensure_palette(db)
+    zones = _ensure_zones(db)
+    existing_slugs = set(db.scalars(select(Product.slug)).all())
+    products_added = 0
+    for spec in [*PRODUCTS, *EXTRA_PRODUCTS]:
+        if spec["slug"] in existing_slugs:
+            continue
+        _create_product_from_spec(db, spec, by_name, is_demo=True)
+        products_added += 1
+        existing_slugs.add(spec["slug"])
+    db.flush()
+
+    clients = list(db.scalars(select(User).where(User.role == UserRole.client.value, User.is_active.is_(True))).all())
+    if not clients:
+        clients = [
+            User(
+                email=f"sample.client.{uuid4().hex[:6]}@aftrends.com",
+                full_name=name,
+                phone=f"024{randint(1000000, 9999999)}",
+                role=UserRole.client.value,
+                password_hash=hash_password("trends123"),
+            )
+            for name in ("Nana Asare", "Kwame Boateng", "Abena Sarpong")
+        ]
+        db.add_all(clients)
+        db.flush()
+
+    cities = [
+        ("12 Oxford Street", "Accra", "Greater Accra"),
+        ("8 Beach Road", "Tema", "Greater Accra"),
+        ("21 Kejetia Lane", "Kumasi", "Ashanti"),
+    ]
+    addresses_added = 0
+    for index, client in enumerate(clients):
+        has_address = db.scalar(select(Address.id).where(Address.user_id == client.id).limit(1))
+        if has_address:
+            continue
+        line1, city, region = cities[index % len(cities)]
+        db.add(
+            Address(
+                user_id=client.id,
+                label="Home",
+                line1=line1,
+                city=city,
+                region=region,
+                notes="Sample address",
+                is_default=True,
+            )
+        )
+        addresses_added += 1
+    db.flush()
+
+    variants = list(
+        db.scalars(
+            select(Variant)
+            .options(selectinload(Variant.color), selectinload(Variant.product).selectinload(Product.images))
+            .where(Variant.stock > 0)
+        ).all()
+    )
+    if not variants:
+        db.commit()
+        return {"products": products_added, "orders": 0, "notifications": 0, "addresses": addresses_added}
+
+    statuses = [
+        (OrderStatus.pending, PaymentStatus.unpaid, False),
+        (OrderStatus.confirmed, PaymentStatus.unpaid, True),
+        (OrderStatus.packed, PaymentStatus.unpaid, True),
+        (OrderStatus.out_for_delivery, PaymentStatus.unpaid, True),
+        (OrderStatus.delivered, PaymentStatus.paid, False),
+        (OrderStatus.cancelled, PaymentStatus.unpaid, False),
+    ]
+    orders_added = 0
+    notices_added = 0
+    batch = 12
+    number_prefix, number_base = _next_sample_order_prefix(db)
+    for index in range(1, batch + 1):
+        client = choice(clients)
+        address = db.scalar(select(Address).where(Address.user_id == client.id).limit(1))
+        if address is None:
+            continue
+        zone = choice(zones) if zones else None
+        picked = sample(variants, k=min(randint(1, 3), len(variants)))
+        status, pay_status, hold = choice(statuses)
+        items_data = []
+        subtotal = Decimal("0.00")
+        for variant in picked:
+            qty = randint(1, 2)
+            price = variant.price if variant.price is not None else variant.product.base_price
+            subtotal += price * qty
+            image = next((img.url for img in variant.product.images if img.is_primary), "")
+            if not image and variant.product.images:
+                image = variant.product.images[0].url
+            items_data.append((variant, qty, price, image))
+            if hold and status in STOCK_RESERVED_STATUSES:
+                variant.stock = max(0, variant.stock - qty)
+                db.add(variant)
+        fee = zone.fee if zone else Decimal("0.00")
+        placed = utcnow() - timedelta(days=randint(0, 12), hours=randint(0, 20))
+        order = Order(
+            order_number=f"{number_prefix}{number_base + index:04d}",
+            customer_id=client.id,
+            status=status.value,
+            payment_method=PaymentMethod.cash_on_delivery.value,
+            payment_status=pay_status.value,
+            subtotal=subtotal,
+            delivery_fee=fee,
+            total=subtotal + fee,
+            currency="GHS",
+            customer_note=choice(["", "Call on arrival.", "Leave with security."]),
+            delivery_zone_id=zone.id if zone else None,
+            zone_name=zone.name if zone else "",
+            address_label=address.label,
+            address_line1=address.line1,
+            address_line2=address.line2,
+            address_city=address.city,
+            address_region=address.region,
+            address_notes=address.notes,
+            stock_held=hold and status in STOCK_RESERVED_STATUSES,
+            created_at=placed,
+        )
+        db.add(order)
+        db.flush()
+        for variant, qty, price, image in items_data:
+            db.add(
+                OrderItem(
+                    order_id=order.id,
+                    product_id=variant.product_id,
+                    variant_id=variant.id,
+                    product_name=variant.product.name,
+                    color_name=variant.color.name,
+                    color_hex=variant.color.hex,
+                    size=variant.size,
+                    sku=variant.sku,
+                    quantity=qty,
+                    unit_price=price,
+                    image_url=image or "",
+                )
+            )
+        db.add(
+            OrderEvent(
+                order_id=order.id,
+                actor_id=None,
+                from_status="",
+                to_status=status.value,
+                note="Sample order generated.",
+                created_at=placed,
+            )
+        )
+        notice_status = choice(["sent", "sent", "failed"])
+        db.add(
+            Notification(
+                kind="sms",
+                idempotency_key=f"sample:sms:{order.order_number}:{uuid4().hex[:8]}",
+                order_id=order.id,
+                order_number=order.order_number,
+                title=f"Order {order.order_number}",
+                customer_name=client.full_name,
+                body=(
+                    f"AF Trends order {order.order_number}\n"
+                    f"Placed by: {client.full_name}\n"
+                    f"Customer phone: {client.phone or 'n/a'}\n"
+                    f"Total: GHS {subtotal + fee}"
+                ),
+                recipients=client.phone or "",
+                sender=settings.sms_sender,
+                status=notice_status,
+                created_at=placed,
+            )
+        )
+        orders_added += 1
+        notices_added += 1
+
+    db.commit()
+    return {
+        "products": products_added,
+        "orders": orders_added,
+        "notifications": notices_added,
+        "addresses": addresses_added,
+    }
+
+
 def seed_if_empty(db: Session) -> None:
     if db.scalar(select(User).limit(1)):
         return
@@ -212,6 +570,9 @@ def seed_if_empty(db: Session) -> None:
             cod_instructions="Please have the exact amount ready. Payment is collected on delivery.",
             low_stock_threshold=5,
             sms_admin_number=settings.sms_admin_number,
+            sms_sender=settings.sms_sender,
+            vynfy_api_key=settings.vynfy_api_key,
+            vynfy_api_url=settings.vynfy_api_url,
             test_mode=False,
         )
     )

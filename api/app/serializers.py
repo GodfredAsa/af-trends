@@ -5,6 +5,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.cart_hold import CART_HOLD_HOURS
+from app.config import settings
 from app.models import ColorPalette, Order, PaymentProof, Product, ProductImage, StoreSettings, User, UserRole, Variant
 from app.money import as_money, money_str
 from app.privileges import privileges_for
@@ -48,6 +49,23 @@ def get_settings(db: Session) -> StoreSettings:
     row = db.get(StoreSettings, 1)
     if row is None:
         row = StoreSettings(id=1)
+        db.add(row)
+        db.commit()
+        db.refresh(row)
+    changed = False
+    if not (getattr(row, "sms_sender", None) or "").strip() and settings.sms_sender:
+        row.sms_sender = settings.sms_sender
+        changed = True
+    if not (getattr(row, "vynfy_api_key", None) or "").strip() and settings.vynfy_api_key:
+        row.vynfy_api_key = settings.vynfy_api_key
+        changed = True
+    if not (getattr(row, "vynfy_api_url", None) or "").strip() and settings.vynfy_api_url:
+        row.vynfy_api_url = settings.vynfy_api_url
+        changed = True
+    if not (getattr(row, "sms_admin_number", None) or "").strip() and settings.sms_admin_number:
+        row.sms_admin_number = settings.sms_admin_number
+        changed = True
+    if changed:
         db.add(row)
         db.commit()
         db.refresh(row)
